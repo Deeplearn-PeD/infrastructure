@@ -11,9 +11,9 @@ variable "server_name" {
 }
 
 variable "server_type" {
-  description = "Hetzner server type (CX42 recommended)"
+  description = "Hetzner server type (CX43 recommended)"
   type        = string
-  default     = "cx42"
+  default     = "cx43"  # 8 vCPU, 16GB RAM (Intel Ice Lake)
 }
 
 variable "location" {

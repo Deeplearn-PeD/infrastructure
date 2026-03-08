@@ -18,7 +18,7 @@ This repository contains the infrastructure code to deploy and manage two AI-pow
                       │
                       ▼
         ┌─────────────────────────────┐
-        │  Hetzner Cloud Server CX42  │
+        │  Hetzner Cloud Server CX43  │
         │   (8 vCPU, 16GB RAM)        │
         │   Helsinki (hel1)           │
         └──────────┬──────────────────┘
@@ -75,14 +75,26 @@ This repository contains the infrastructure code to deploy and manage two AI-pow
 
 ## 🛠️ Quick Start
 
-### 1. Clone the Repository
+> **📍 IMPORTANT**: All steps in this Quick Start guide are executed on your **LOCAL DEVELOPMENT MACHINE** (your computer).
+> 
+> OpenTofu and Ansible will automatically configure the **REMOTE HETZNER SERVER** for you. You do NOT need to manually SSH into the server for deployment.
+>
+> **Execution Location Key:**
+> - 💻 **LOCAL**: Run on your development machine
+> - 🖥️ **REMOTE**: Automatically executed on Hetzner server (via cloud-init or Ansible)
+
+### 1. Clone the Repository 💻
+
+**Execute on: Local Machine**
 
 ```bash
 git clone https://github.com/your-org/kwarai-infra.git
 cd kwarai-infra
 ```
 
-### 2. Configure Hetzner API Token
+### 2. Configure Hetzner API Token 💻
+
+**Execute on: Local Machine**
 
 ```bash
 ./scripts/setup-hetzner-api.sh
@@ -90,7 +102,13 @@ cd kwarai-infra
 
 Follow the prompts to create and configure your Hetzner Cloud API token.
 
-### 3. Configure Variables
+This script will:
+- Guide you through creating a Hetzner API token
+- Create `terraform.tfvars` file with your token
+
+### 3. Configure Variables 💻
+
+**Execute on: Local Machine**
 
 Edit `terraform.tfvars` and set required variables:
 
@@ -107,19 +125,26 @@ Key variables to set:
 - `openai_api_key`: Your OpenAI API key (optional)
 - `gemini_api_key`: Your Gemini API key (optional)
 
-### 4. Deploy Infrastructure
+### 4. Deploy Infrastructure 💻 → 🖥️
+
+**Execute on: Local Machine** (deploys to Remote Server)
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-This will:
-1. Create Hetzner Cloud server (CX42)
-2. Attach storage volumes
-3. Configure firewall
-4. Set up monitoring
+This command will:
+1. **LOCAL**: Initialize OpenTofu
+2. **LOCAL**: Create execution plan
+3. **REMOTE**: Create Hetzner Cloud server (CX43) in Helsinki
+4. **REMOTE**: Attach storage volumes (200GB total)
+5. **REMOTE**: Configure firewall (via Hetzner API)
+6. **REMOTE**: Execute cloud-init for initial setup (Docker, firewall, security)
+7. **LOCAL**: Generate Ansible inventory with server IP
 
-### 5. Configure DNS
+### 5. Configure DNS 💻
+
+**Execute on: Local Machine** (configure your DNS provider)
 
 Add A records to your domain:
 
@@ -129,7 +154,11 @@ libby.kwar-ai.com.br      A    <SERVER_IP>
 grafana.kwar-ai.com.br    A    <SERVER_IP>
 ```
 
-### 6. Deploy Services
+Note: You'll get the `<SERVER_IP>` from the output of step 4.
+
+### 6. Deploy Services 💻 → 🖥️
+
+**Execute on: Local Machine** (configures Remote Server via Ansible)
 
 Wait for DNS propagation (5-30 minutes), then:
 
@@ -137,14 +166,20 @@ Wait for DNS propagation (5-30 minutes), then:
 ./scripts/deploy-services.sh
 ```
 
-This will:
-1. Install Docker and Docker Compose
-2. Configure Nginx with SSL
-3. Deploy Libby server with PostgreSQL
-4. Deploy EpidBot
-5. Set up monitoring stack
+This command will connect to your server and **REMOTELY** execute:
+1. Install Docker and Docker Compose (if not already installed)
+2. Configure Nginx with SSL certificates (Let's Encrypt)
+3. Deploy Libby server with PostgreSQL and Ollama
+4. Deploy EpidBot application
+5. Set up Prometheus + Grafana monitoring stack
+6. Configure automatic backups
+7. Start all services with health checks
 
-### 7. Verify Deployment
+All of this happens **automatically on the remote server** via Ansible.
+
+### 7. Verify Deployment 💻
+
+**Execute on: Local Machine**
 
 ```bash
 ./scripts/healthcheck.sh
@@ -205,7 +240,7 @@ All services are configured via environment variables in `terraform.tfvars`:
 ```hcl
 # Server Configuration
 server_name   = "kwar-ai-server"
-server_type   = "cx42"
+server_type   = "cx43"
 location      = "hel1"
 
 # Domain Configuration
@@ -289,35 +324,44 @@ Backups run daily at 2 AM UTC and include:
 
 Retention: 7 days by default
 
-### Manual Backup
+### Manual Backup 💻
+
+**Execute on: Local Machine**
 
 ```bash
 ./scripts/backup.sh
 ```
 
-Backups are stored in `./backups/` directory.
+This script will:
+1. Connect to the remote server via SSH
+2. Create backups of PostgreSQL, Libby, and EpidBot data
+3. Download backups to your local machine in `./backups/` directory
 
-### Recovery
+Backups are stored locally in `./backups/` directory.
 
-To restore from backup:
+### Recovery 💻 → 🖥️
+
+**Execute on: Local Machine** (applies to Remote Server)
+
+To restore from backup, you'll need to SSH into the server:
 
 ```bash
-# SSH into server
+# SSH into server (from local machine)
 ssh root@<SERVER_IP>
 
-# Stop services
+# On the REMOTE SERVER, stop services
 cd /opt/kwar-ai/libby && docker-compose down
 cd /opt/kwar-ai/epidbot && docker-compose down
 
-# Restore PostgreSQL
+# Restore PostgreSQL (on REMOTE SERVER)
 gunzip -c /path/to/backup/postgres_backup.sql.gz | \
   docker exec -i libby-postgres psql -U libby
 
-# Restore data directories
+# Restore data directories (on REMOTE SERVER)
 tar -xzf /path/to/backup/libby_data.tar.gz -C /opt/kwar-ai/libby
 tar -xzf /path/to/backup/epidbot_data.tar.gz -C /opt/kwar-ai/epidbot
 
-# Start services
+# Start services (on REMOTE SERVER)
 docker-compose up -d
 ```
 
@@ -398,7 +442,7 @@ Monthly costs on Hetzner Cloud:
 
 | Resource | Type | Cost |
 |----------|------|------|
-| Server | CX42 (8 vCPU, 16GB) | €15.60 |
+| Server | CX43 (8 vCPU, 16GB) | €15.60 |
 | Storage | 200GB volumes | €4.80 |
 | Traffic | 10TB included | €0.00 |
 | **Total** | | **€20.40/month** |
@@ -407,7 +451,9 @@ Monthly costs on Hetzner Cloud:
 
 ### Common Issues
 
-#### 1. SSH Connection Refused
+#### 1. SSH Connection Refused 💻
+
+**Execute on: Local Machine**
 
 ```bash
 # Check if server is running
@@ -417,61 +463,79 @@ tofu show | grep status
 ssh -i ./ssh_keys/kwar-ai-ssh-key root@<SERVER_IP>
 ```
 
-#### 2. SSL Certificate Error
+#### 2. SSL Certificate Error 💻 → 🖥️
+
+**Execute on: Local Machine** (commands run on Remote Server)
 
 ```bash
 # SSH into server
 ssh root@<SERVER_IP>
 
-# Check certificate files
+# On REMOTE SERVER: Check certificate files
 ls -la /opt/kwar-ai/nginx/ssl/
 
-# Renew certificates manually
+# On REMOTE SERVER: Renew certificates manually
 certbot renew --force-renewal
 ```
 
-#### 3. Service Not Responding
+#### 3. Service Not Responding 💻 → 🖥️
+
+**Execute on: Local Machine** (commands run on Remote Server)
 
 ```bash
-# Check container status
+# SSH into server
+ssh root@<SERVER_IP>
+
+# On REMOTE SERVER: Check container status
 docker ps -a
 
-# View logs
+# On REMOTE SERVER: View logs
 docker logs libby-api
 docker logs epidbot
 
-# Restart services
+# On REMOTE SERVER: Restart services
 cd /opt/kwar-ai/libby && docker-compose restart
 cd /opt/kwar-ai/epidbot && docker-compose restart
 ```
 
-#### 4. Database Connection Error
+#### 4. Database Connection Error 💻 → 🖥️
+
+**Execute on: Local Machine** (commands run on Remote Server)
 
 ```bash
-# Check PostgreSQL status
+# SSH into server
+ssh root@<SERVER_IP>
+
+# On REMOTE SERVER: Check PostgreSQL status
 docker exec libby-postgres pg_isready
 
-# Check database logs
+# On REMOTE SERVER: Check database logs
 docker logs libby-postgres
 
-# Reset database (WARNING: destroys data)
+# On REMOTE SERVER: Reset database (WARNING: destroys data)
 docker exec libby-postgres psql -U libby -c "DROP DATABASE libby;"
 docker exec libby-postgres psql -U libby -c "CREATE DATABASE libby;"
 ```
 
-### Logs
+### Logs 💻 → 🖥️
 
-View logs:
+**Execute on: Local Machine** (commands run on Remote Server)
+
+View logs by SSHing into the server:
+
 ```bash
-# All services
+# SSH into server
+ssh root@<SERVER_IP>
+
+# On REMOTE SERVER: View all services
 docker-compose logs -f
 
-# Specific service
+# On REMOTE SERVER: View specific service
 docker logs -f libby-api
 docker logs -f epidbot
 docker logs -f nginx-proxy
 
-# System logs
+# On REMOTE SERVER: View system logs
 journalctl -u docker
 ```
 

@@ -28,6 +28,26 @@ if [ ! -f "terraform.tfvars" ]; then
     exit 1
 fi
 
+# Extract HCLOUD_TOKEN from terraform.tfvars and export it
+# This ensures the token is available to the provider
+if grep -q "^hcloud_token" terraform.tfvars; then
+    HCLOUD_TOKEN=$(grep "^hcloud_token" terraform.tfvars | cut -d'"' -f2)
+    if [ -n "$HCLOUD_TOKEN" ] && [ "$HCLOUD_TOKEN" != "YOUR_HETZNER_API_TOKEN_HERE" ]; then
+        export HCLOUD_TOKEN
+        echo "✓ HCLOUD_TOKEN loaded from terraform.tfvars"
+    else
+        echo "ERROR: Invalid or placeholder token in terraform.tfvars"
+        echo "Please run: ./scripts/setup-hetzner-api.sh"
+        exit 1
+    fi
+else
+    echo "ERROR: hcloud_token not found in terraform.tfvars"
+    echo "Please run: ./scripts/setup-hetzner-api.sh"
+    exit 1
+fi
+
+echo ""
+
 # Initialize OpenTofu
 echo "Initializing OpenTofu..."
 tofu init
@@ -43,6 +63,7 @@ read -p "Do you want to apply this plan? (y/n): " confirm
 
 if [[ $confirm != "y" && $confirm != "Y" ]]; then
     echo "Deployment cancelled"
+    rm -f tfplan
     exit 0
 fi
 

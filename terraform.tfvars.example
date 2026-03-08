@@ -11,7 +11,7 @@ hcloud_token = "YOUR_HETZNER_API_TOKEN_HERE"
 # ============================================
 
 server_name   = "kwar-ai-server"
-server_type   = "cx42"  # 8 vCPU, 16GB RAM
+server_type   = "cx43"  # 8 vCPU, 16GB RAM (Intel Ice Lake)
 location      = "hel1"  # Helsinki data center
 image         = "ubuntu-24.04"
 

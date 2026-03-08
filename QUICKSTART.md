@@ -2,7 +2,13 @@
 
 Get Kwar-AI infrastructure up and running in 30 minutes.
 
-## Prerequisites Check
+> **📍 IMPORTANT**: All steps in this guide are executed on your **LOCAL DEVELOPMENT MACHINE** (your computer).
+> 
+> OpenTofu and Ansible will automatically configure the **REMOTE HETZNER SERVER** for you. You do NOT need to manually SSH into the server for deployment.
+
+## Prerequisites Check 💻
+
+**Execute on: Local Machine**
 
 ```bash
 # Check OpenTofu
@@ -17,7 +23,9 @@ ls -la ~/.ssh/id_rsa.pub
 
 ## 5-Step Deployment
 
-### Step 1: Setup Hetzner API (2 minutes)
+### Step 1: Setup Hetzner API (2 minutes) 💻
+
+**Execute on: Local Machine**
 
 ```bash
 ./scripts/setup-hetzner-api.sh
@@ -27,7 +35,9 @@ This will:
 - Guide you through creating a Hetzner API token
 - Create `terraform.tfvars` with your token
 
-### Step 2: Configure Secrets (5 minutes)
+### Step 2: Configure Secrets (5 minutes) 💻
+
+**Execute on: Local Machine**
 
 Edit `terraform.tfvars` and set these required values:
 
@@ -47,21 +57,26 @@ Optional: Add API keys if you have them:
 - `zhipu_api_key`
 - `deepseek_api_key`
 
-### Step 3: Deploy Infrastructure (10 minutes)
+### Step 3: Deploy Infrastructure (10 minutes) 💻 → 🖥️
+
+**Execute on: Local Machine** (deploys to Remote Server)
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-This creates:
-- Hetzner CX42 server (Helsinki)
+This creates on the **REMOTE SERVER**:
+- Hetzner CX43 server (Helsinki)
 - 200GB storage volumes
 - Firewall rules
 - SSH keys
+- Initial server setup via cloud-init
 
 **Note the server IP address from the output.**
 
-### Step 4: Configure DNS (2 minutes)
+### Step 4: Configure DNS (2 minutes) 💻
+
+**Execute on: Local Machine** (configure your DNS provider)
 
 Add these A records to your domain (kwar-ai.com.br):
 
@@ -82,7 +97,9 @@ Value: <SERVER_IP>
 TTL: 300
 ```
 
-### Step 5: Deploy Services (10 minutes)
+### Step 5: Deploy Services (10 minutes) 💻 → 🖥️
+
+**Execute on: Local Machine** (configures Remote Server via Ansible)
 
 Wait 5-10 minutes for DNS propagation, then:
 
@@ -90,14 +107,18 @@ Wait 5-10 minutes for DNS propagation, then:
 ./scripts/deploy-services.sh
 ```
 
-This installs:
+This will connect to your server and **REMOTELY** install:
 - Docker and Docker Compose
 - Nginx with SSL (Let's Encrypt)
 - Libby server (PostgreSQL + Ollama)
 - EpidBot application
 - Prometheus + Grafana monitoring
 
-## Verify Deployment
+All of this happens **automatically on the remote server** via Ansible.
+
+## Verify Deployment 💻
+
+**Execute on: Local Machine**
 
 ```bash
 ./scripts/healthcheck.sh
@@ -108,32 +129,35 @@ Access your services:
 - **Libby API**: https://libby.kwar-ai.com.br/api/health
 - **Grafana**: https://grafana.kwar-ai.com.br
 
-## Common Commands
+## Common Commands 💻 → 🖥️
+
+**Execute on: Local Machine** (unless noted otherwise)
 
 ```bash
-# SSH into server
+# SSH into server (from local machine)
 ssh -i ./ssh_keys/kwar-ai-ssh-key root@<SERVER_IP>
 
-# View logs
+# Once on the REMOTE SERVER, you can run:
 docker logs -f epidbot
 docker logs -f libby-api
 docker logs -f nginx-proxy
 
-# Restart services
-ssh root@<SERVER_IP>
+# Restart services (on REMOTE SERVER)
 cd /opt/kwar-ai/epidbot && docker-compose restart
 cd /opt/kwar-ai/libby && docker-compose restart
 
+# Back to LOCAL MACHINE:
 # Create backup
 ./scripts/backup.sh
 
 # Health check
 ./scripts/healthcheck.sh
 ```
-
 ## Troubleshooting
 
-### DNS Not Propagating
+### DNS Not Propagating 💻
+
+**Execute on: Local Machine**
 
 ```bash
 # Check DNS
@@ -143,32 +167,39 @@ nslookup epidbot.kwar-ai.com.br
 # Wait longer (up to 30 minutes)
 ```
 
-### SSL Certificate Issues
+### SSL Certificate Issues 💻 → 🖥️
+
+**Execute on: Local Machine** (commands run on Remote Server)
 
 ```bash
-# SSH into server
+# SSH into server (from local machine)
 ssh root@<SERVER_IP>
 
-# Check certificates
+# On REMOTE SERVER: Check certificates
 ls -la /opt/kwar-ai/nginx/ssl/
 
-# Force renewal
+# On REMOTE SERVER: Force renewal
 certbot renew --force-renewal
 docker restart nginx-proxy
 ```
 
-### Services Not Starting
+### Services Not Starting 💻 → 🖥️
+
+**Execute on: Local Machine** (commands run on Remote Server)
 
 ```bash
-# Check container status
+# SSH into server (from local machine)
+ssh root@<SERVER_IP>
+
+# On REMOTE SERVER: Check container status
 docker ps -a
 
-# View logs
+# On REMOTE SERVER: View logs
 docker logs libby-api
 docker logs epidbot
 docker logs libby-postgres
 
-# Restart all services
+# On REMOTE SERVER: Restart all services
 docker-compose -f /opt/kwar-ai/libby/docker-compose.yml restart
 docker-compose -f /opt/kwar-ai/epidbot/docker-compose.yml restart
 ```

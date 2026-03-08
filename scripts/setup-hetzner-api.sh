@@ -33,15 +33,43 @@ fi
 echo ""
 read -sp "Enter your Hetzner API token: " API_TOKEN
 echo ""
+echo ""
 
 # Verify token
 echo "Verifying token..."
-if ! curl -s -H "Authorization: Bearer $API_TOKEN" https://api.hetzner.cloud/v1/server | grep -q "servers"; then
-    echo "ERROR: Invalid API token or API is unreachable"
+
+# Debug: Show token length (not the token itself)
+echo "Token length: ${#API_TOKEN} characters"
+
+# Make API call and capture both status and response
+HTTP_STATUS=$(curl -s -o /tmp/hetzner_response.txt -w "%{http_code}" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    https://api.hetzner.cloud/v1/servers)
+
+RESPONSE=$(cat /tmp/hetzner_response.txt)
+rm -f /tmp/hetzner_response.txt
+
+echo "HTTP Status: $HTTP_STATUS"
+
+if [ "$HTTP_STATUS" = "200" ]; then
+    echo "✓ Token is valid!"
+elif [ "$HTTP_STATUS" = "401" ]; then
+    echo "ERROR: Invalid API token (unauthorized)"
+    echo ""
+    echo "Please check that you copied the entire token correctly."
+    exit 1
+elif [ "$HTTP_STATUS" = "000" ]; then
+    echo "ERROR: Cannot reach Hetzner API"
+    echo ""
+    echo "Please check your internet connection."
+    exit 1
+else
+    echo "ERROR: API request failed (HTTP $HTTP_STATUS)"
+    echo ""
+    echo "Response: $RESPONSE"
     exit 1
 fi
 
-echo "✓ Token is valid!"
 echo ""
 
 # Create terraform.tfvars file
@@ -57,13 +85,13 @@ fi
 cp terraform.tfvars.example terraform.tfvars
 
 # Update token in file
+# Use | as delimiter to avoid issues with special characters in token
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/YOUR_HETZNER_API_TOKEN_HERE/$API_TOKEN/" terraform.tfvars
+    sed -i '' "s|YOUR_HETZNER_API_TOKEN_HERE|${API_TOKEN}|g" terraform.tfvars
 else
-    sed -i "s/YOUR_HETZNER_API_TOKEN_HERE/$API_TOKEN/" terraform.tfvars
+    sed -i "s|YOUR_HETZNER_API_TOKEN_HERE|${API_TOKEN}|g" terraform.tfvars
 fi
 
-echo ""
 echo "✓ terraform.tfvars created with your API token"
 echo ""
 echo "Next steps:"

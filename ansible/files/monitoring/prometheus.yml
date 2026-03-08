@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'kwar-ai'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/rules/alerts.yml
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['204.168.149.153:9323']
+
+  - job_name: 'libby'
+    static_configs:
+      - targets: ['libby-api:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'epidbot'
+    static_configs:
+      - targets: ['epidbot:7860']
+    metrics_path: '/metrics'

@@ -28,28 +28,27 @@
 - name: Obtain SSL certificates with Certbot
   shell: |
     certbot certonly --standalone \
-      -d {{ domain_name }} \
       -d {{ epidbot_subdomain }} \
       -d {{ libby_subdomain }} \
       {% if enable_monitoring %}-d {{ grafana_subdomain }} {% endif %} \
       --non-interactive --agree-tos --email {{ admin_email }} \
-      --pre-hook "docker stop nginx" \
-      --post-hook "docker start nginx"
+      --pre-hook "docker stop nginx-proxy 2>/dev/null || true" \
+      --post-hook "docker start nginx-proxy 2>/dev/null || true"
   args:
-    creates: /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+    creates: /etc/letsencrypt/live/{{ epidbot_subdomain }}/fullchain.pem
   when: not ssl_cert.stat.exists
 
 - name: Copy SSL certificates to Nginx directory
   shell: |
-    cp /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem /opt/kwar-ai/nginx/ssl/
-    cp /etc/letsencrypt/live/{{ domain_name }}/privkey.pem /opt/kwar-ai/nginx/ssl/
+    cp /etc/letsencrypt/live/{{ epidbot_subdomain }}/fullchain.pem /opt/kwar-ai/nginx/ssl/
+    cp /etc/letsencrypt/live/{{ epidbot_subdomain }}/privkey.pem /opt/kwar-ai/nginx/ssl/
     chmod 644 /opt/kwar-ai/nginx/ssl/*.pem
   when: not ssl_cert.stat.exists
 
 - name: Set up certificate renewal cron job
   cron:
     name: "Renew SSL certificates"
-    job: "certbot renew --quiet --post-hook 'cp /etc/letsencrypt/live/{{ domain_name }}/*.pem /opt/kwar-ai/nginx/ssl/ && docker restart nginx'"
+    job: "certbot renew --quiet --post-hook 'cp /etc/letsencrypt/live/{{ epidbot_subdomain }}/*.pem /opt/kwar-ai/nginx/ssl/ && docker restart nginx-proxy 2>/dev/null || true'"
     minute: "0"
     hour: "0"
     day: "1"

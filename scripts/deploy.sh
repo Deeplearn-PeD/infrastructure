@@ -85,7 +85,19 @@ echo ""
 
 # Generate Ansible inventory
 echo "Generating Ansible inventory..."
-SSH_KEY_PATH=$(tofu output -raw ssh_private_key_path 2>/dev/null || echo "./ssh_keys/kwar-ai-ssh-key")
+SSH_KEY_PATH=$(tofu output -raw ssh_private_key_path 2>/dev/null || echo "")
+
+# Convert to absolute path if relative
+if [[ "$SSH_KEY_PATH" != /* ]]; then
+    SSH_KEY_PATH="${PROJECT_ROOT}/${SSH_KEY_PATH}"
+fi
+
+# If SSH key path is empty or doesn't exist, use default
+if [ -z "$SSH_KEY_PATH" ] || [ ! -f "$SSH_KEY_PATH" ]; then
+    SSH_KEY_PATH="${PROJECT_ROOT}/ssh_keys/kwar-ai-ssh-key"
+fi
+
+echo "SSH Key Path: $SSH_KEY_PATH"
 
 cat > ansible/inventory.ini << EOF
 [webservers]
@@ -93,17 +105,33 @@ ${SERVER_IP} ansible_user=root ansible_ssh_private_key_file=${SSH_KEY_PATH}
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 EOF
 
 # Generate Ansible variables
 echo "Generating Ansible variables..."
 tofu output -json > /tmp/tofu_outputs.json
 
-# Create group_vars from terraform outputs
+# Extract variables from terraform.tfvars and add to group_vars
+echo "Extracting configuration from terraform.tfvars..."
+
+# Create group_vars with both outputs and tfvars
 cat > ansible/group_vars/all.yml << EOF
 ---
-$(tofu output -json | jq -r 'to_entries | .[] | "\(.key): \"\(.value.value)\""' | head -n -1)
+# Server outputs
+server_ip: "$(tofu output -raw server_ip)"
+server_name: "$(tofu output -raw server_name)"
+server_status: "$(tofu output -raw server_status)"
+domain_name: "$(tofu output -raw domain_name)"
+epidbot_url: "$(tofu output -raw epidbot_url)"
+libby_url: "$(tofu output -raw libby_url)"
+grafana_url: "$(tofu output -raw grafana_url)"
+
+# Variables from terraform.tfvars
+$(grep -E "^(admin_email|postgres_db|postgres_user|postgres_password|secret_key|backup_retention_days|enable_monitoring|grafana_admin_password|openai_api_key|gemini_api_key|zhipu_api_key|deepseek_api_key|github_client_id|github_client_secret|embedding_model|ollama_model|epidbot_subdomain|libby_subdomain|grafana_subdomain)" terraform.tfvars | sed 's/\s*=\s*/: /' | sed 's/"\([^"]*\)"/"\1"/g')
 EOF
+
+echo "✓ Ansible variables generated"
 
 echo ""
 echo "Next steps:"

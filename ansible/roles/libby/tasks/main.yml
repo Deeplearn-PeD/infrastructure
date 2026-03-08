@@ -36,11 +36,11 @@
   changed_when: "'Downloaded' in pull_result.stdout"
 
 - name: Start Libby services
-  docker_compose:
-    project_src: /opt/kwar-ai/libby
-    state: present
-    restarted: yes
+  command: docker-compose up -d
+  args:
+    chdir: /opt/kwar-ai/libby
   register: libby_start
+  changed_when: "'Starting' in libby_start.stdout or 'Created' in libby_start.stdout"
 
 - name: Wait for PostgreSQL to be ready
   wait_for:

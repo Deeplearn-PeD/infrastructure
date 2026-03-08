@@ -95,11 +95,6 @@ write_files:
         }
       }
 
-  - path: /etc/systemd/system/docker.service.d/override.conf
-    content: |
-      [Service]
-      ExecStartPost=/bin/sh -c "sleep 5 && systemctl restart docker"
-
 # Run commands to set up the system
 runcmd:
   # Configure UFW firewall
@@ -132,7 +127,6 @@ runcmd:
   # Configure Docker daemon
   - mkdir -p /etc/docker
   - cp /opt/docker/daemon.json /etc/docker/daemon.json
-  - systemctl restart docker
   - systemctl enable docker
 
   # Create application directories

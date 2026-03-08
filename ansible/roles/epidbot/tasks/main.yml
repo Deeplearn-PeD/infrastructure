@@ -32,11 +32,11 @@
   failed_when: false
 
 - name: Start EpidBot services
-  docker_compose:
-    project_src: /opt/kwar-ai/epidbot
-    state: present
-    restarted: yes
+  command: docker-compose up -d
+  args:
+    chdir: /opt/kwar-ai/epidbot
   register: epidbot_start
+  changed_when: "'Starting' in epidbot_start.stdout or 'Created' in epidbot_start.stdout"
 
 - name: Wait for EpidBot to be healthy
   uri:

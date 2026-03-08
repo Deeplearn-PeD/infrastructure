@@ -48,11 +48,11 @@
   failed_when: false
 
 - name: Start monitoring services
-  docker_compose:
-    project_src: /opt/kwar-ai/monitoring
-    state: present
-    restarted: yes
+  command: docker-compose up -d
+  args:
+    chdir: /opt/kwar-ai/monitoring
   register: monitoring_start
+  changed_when: "'Starting' in monitoring_start.stdout or 'Created' in monitoring_start.stdout"
 
 - name: Wait for Prometheus to be ready
   wait_for:

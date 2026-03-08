@@ -1,20 +1,79 @@
 ---
-- name: Ensure Docker is installed
+- name: Check if Docker is installed
   command: docker --version
   register: docker_version
   changed_when: false
   failed_when: false
 
-- name: Install Docker if not present
-  shell: |
-    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-    sh /tmp/get-docker.sh
-  when: docker_version.rc != 0
+- name: Display Docker version
+  debug:
+    msg: "Docker version: {{ docker_version.stdout }}"
+  when: docker_version.rc == 0
 
-- name: Ensure Docker service is running
+- name: Check Docker service status
+  command: systemctl is-active docker
+  register: docker_status
+  changed_when: false
+  failed_when: false
+
+- name: Display Docker service status
+  debug:
+    msg: "Docker service status: {{ docker_status.stdout }}"
+  when: docker_status.rc == 0
+
+- name: Debug Docker if not running
+  block:
+    - name: Get Docker service logs
+      command: journalctl -u docker.service -n 30 --no-pager
+      register: docker_logs
+      changed_when: false
+      
+    - name: Display Docker logs
+      debug:
+        msg: "{{ docker_logs.stdout_lines }}"
+      
+    - name: Get Docker daemon config
+      stat:
+        path: /etc/docker/daemon.json
+      register: daemon_json
+      
+    - name: Display daemon.json if exists
+      debug:
+        msg: "daemon.json exists: {{ daemon_json.stat.exists }}"
+      
+    - name: Remove problematic daemon.json
+      file:
+        path: /etc/docker/daemon.json
+        state: absent
+      when: daemon_json.stat.exists
+      
+    - name: Restart Docker after removing config
+      systemd:
+        name: docker
+        state: restarted
+      register: docker_restart
+      
+    - name: Wait for Docker to start
+      wait_for:
+        timeout: 10
+      when: docker_restart.changed
+      
+    - name: Check Docker status again
+      command: systemctl is-active docker
+      register: docker_status_after
+      changed_when: false
+      failed_when: false
+      
+    - name: Fail if Docker still not running
+      fail:
+        msg: "Docker failed to start. Check the logs above for details."
+      when: docker_status_after.rc != 0
+      
+  when: docker_status.rc != 0
+
+- name: Ensure Docker service is enabled
   systemd:
     name: docker
-    state: started
     enabled: yes
 
 - name: Install Docker Compose
@@ -22,6 +81,12 @@
     url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ ansible_system }}-{{ ansible_machine }}"
     dest: /usr/local/bin/docker-compose
     mode: '0755'
+  register: compose_download
+
+- name: Display Docker Compose download status
+  debug:
+    msg: "Docker Compose downloaded successfully"
+  when: compose_download.changed
 
 - name: Create symlink for docker-compose
   file:
@@ -35,10 +100,19 @@
   register: compose_version
   changed_when: false
 
+- name: Display Docker Compose version
+  debug:
+    msg: "{{ compose_version.stdout }}"
+
 - name: Create Docker network for services
-  docker_network:
-    name: kwar-ai-network
-    state: present
+  command: docker network create kwar-ai-network
+  register: network_create
+  changed_when: "'Created' in network_create.stdout"
+  failed_when: network_create.rc != 0 and 'already exists' not in network_create.stderr.lower()
+
+- name: Display network creation status
+  debug:
+    msg: "Docker network created or already exists"
 
 - name: Create application directories
   file:
@@ -54,3 +128,7 @@
     - /opt/kwar-ai/secrets
     - /opt/kwar-ai/backups
     - /var/log/kwar-ai
+
+- name: Display completion message
+  debug:
+    msg: "Docker setup completed successfully"

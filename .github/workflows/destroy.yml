@@ -1,0 +1,50 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm'
+        required: true
+        default: ''
+
+jobs:
+  destroy:
+    name: Destroy Infrastructure
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'destroy'
+    environment:
+      name: destroy
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.6.0
+
+      - name: Create terraform.tfvars
+        run: |
+          cat > terraform.tfvars << EOF
+          hcloud_token = "${{ secrets.HCLOUD_TOKEN }}"
+          admin_email = "${{ secrets.ADMIN_EMAIL }}"
+          postgres_password = "${{ secrets.POSTGRES_PASSWORD }}"
+          secret_key = "${{ secrets.SECRET_KEY }}"
+          grafana_admin_password = "${{ secrets.GRAFANA_ADMIN_PASSWORD }}"
+          openai_api_key = "${{ secrets.OPENAI_API_KEY }}"
+          gemini_api_key = "${{ secrets.GEMINI_API_KEY }}"
+          zhipu_api_key = "${{ secrets.ZHIPU_API_KEY }}"
+          deepseek_api_key = "${{ secrets.DEEPSEEK_API_KEY }}"
+          github_client_id = "${{ secrets.GITHUB_CLIENT_ID }}"
+          github_client_secret = "${{ secrets.GITHUB_CLIENT_SECRET }}"
+          EOF
+
+      - name: OpenTofu Init
+        run: tofu init
+
+      - name: OpenTofu Destroy
+        run: tofu destroy -auto-approve
+
+      - name: Notify
+        run: echo "Infrastructure has been destroyed"

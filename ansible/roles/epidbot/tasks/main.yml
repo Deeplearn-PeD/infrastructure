@@ -1,0 +1,49 @@
+---
+- name: Create EpidBot directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/kwar-ai/epidbot
+    - /opt/kwar-ai/epidbot/data
+    - /opt/kwar-ai/epidbot/data/pysus
+    - /opt/kwar-ai/epidbot/data/plots
+
+- name: Create EpidBot environment file
+  template:
+    src: epidbot.env.j2
+    dest: /opt/kwar-ai/epidbot/.env
+    mode: '0644'
+  no_log: true
+
+- name: Copy EpidBot docker-compose file
+  template:
+    src: epidbot-docker-compose.yml.j2
+    dest: /opt/kwar-ai/epidbot/docker-compose.yml
+    mode: '0644'
+
+- name: Pull EpidBot Docker images
+  command: docker-compose -f /opt/kwar-ai/epidbot/docker-compose.yml pull
+  args:
+    chdir: /opt/kwar-ai/epidbot
+  register: pull_result
+  changed_when: "'Downloaded' in pull_result.stdout"
+  failed_when: false
+
+- name: Start EpidBot services
+  docker_compose:
+    project_src: /opt/kwar-ai/epidbot
+    state: present
+    restarted: yes
+  register: epidbot_start
+
+- name: Wait for EpidBot to be healthy
+  uri:
+    url: http://localhost:7860/
+    method: GET
+    status_code: 200
+  register: result
+  retries: 30
+  delay: 10
+  until: result.status == 200

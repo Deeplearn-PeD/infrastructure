@@ -1,0 +1,66 @@
+---
+- name: Create Libby directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/kwar-ai/libby
+    - /opt/kwar-ai/libby/data
+    - /opt/kwar-ai/libby/docker
+
+- name: Create Libby environment file
+  template:
+    src: libby.env.j2
+    dest: /opt/kwar-ai/libby/.env
+    mode: '0644'
+  no_log: true
+
+- name: Copy Libby docker-compose file
+  template:
+    src: libby-docker-compose.yml.j2
+    dest: /opt/kwar-ai/libby/docker-compose.yml
+    mode: '0644'
+
+- name: Copy PostgreSQL initialization script
+  copy:
+    src: init-db.sql
+    dest: /opt/kwar-ai/libby/docker/init-db.sql
+    mode: '0644'
+
+- name: Pull Libby Docker images
+  command: docker-compose -f /opt/kwar-ai/libby/docker-compose.yml pull
+  args:
+    chdir: /opt/kwar-ai/libby
+  register: pull_result
+  changed_when: "'Downloaded' in pull_result.stdout"
+
+- name: Start Libby services
+  docker_compose:
+    project_src: /opt/kwar-ai/libby
+    state: present
+    restarted: yes
+  register: libby_start
+
+- name: Wait for PostgreSQL to be ready
+  wait_for:
+    host: localhost
+    port: 5432
+    delay: 10
+    timeout: 120
+
+- name: Wait for Libby API to be healthy
+  uri:
+    url: http://localhost:8000/api/health
+    method: GET
+    status_code: 200
+  register: result
+  retries: 30
+  delay: 10
+  until: result.status == 200
+
+- name: Pull Ollama embedding model
+  command: docker exec libby-api ollama pull {{ embedding_model }}
+  register: ollama_pull
+  changed_when: "'pulling' in ollama_pull.stdout.lower()"
+  failed_when: false

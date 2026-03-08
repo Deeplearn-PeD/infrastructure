@@ -1,0 +1,36 @@
+services:
+  epidbot:
+    build: https://github.com/your-org/EpiDBot.git#main
+    image: epidbot:latest
+    container_name: epidbot
+    ports:
+      - '7860:7860'
+    volumes:
+      - epidbot_data:/data
+      - ./data/pysus:/data/pysus
+      - ./data/plots:/data/plots
+    env_file:
+      - .env
+    environment:
+      - LIBBY_URL=http://libby-api:8000
+      - DATA_DIR=/data
+      - PYSUS_PATH=/data/pysus
+      - PLOT_DIR=/data/plots
+      - DB_PATH=/data/chat_history.duckdb
+    restart: unless-stopped
+    networks:
+      - kwar-ai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  epidbot_data:
+    driver: local
+
+networks:
+  kwar-ai-network:
+    external: true

@@ -1,0 +1,223 @@
+#cloud-config
+
+# Update system packages
+package_update: true
+package_upgrade: true
+
+# Install required packages
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - git
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - jq
+  - htop
+  - iotop
+  - ncdu
+  - tree
+  - unzip
+  - wget
+  - rsync
+  - cron
+
+# Configure timezone
+timezone: ${timezone}
+
+# Create deployment user (optional - root is used for simplicity)
+users:
+  - default
+
+# Configure SSH
+ssh_pwauth: false
+disable_root: false
+
+# Write configuration files
+write_files:
+  - path: /etc/environment
+    content: |
+      DOMAIN_NAME=${domain_name}
+      EPIDBOT_SUBDOMAIN=${epidbot_subdomain}
+      LIBBY_SUBDOMAIN=${libby_subdomain}
+      GRAFANA_SUBDOMAIN=${grafana_subdomain}
+      ADMIN_EMAIL=${admin_email}
+      POSTGRES_DB=${postgres_db}
+      POSTGRES_USER=${postgres_user}
+      POSTGRES_PASSWORD=${postgres_password}
+      SECRET_KEY=${secret_key}
+      BACKUP_RETENTION_DAYS=${backup_retention_days}
+      OPENAI_API_KEY=${openai_api_key}
+      GEMINI_API_KEY=${gemini_api_key}
+      ZHIPU_API_KEY=${zhipu_api_key}
+      DEEPSEEK_API_KEY=${deepseek_api_key}
+      GITHUB_CLIENT_ID=${github_client_id}
+      GITHUB_CLIENT_SECRET=${github_client_secret}
+      EMBEDDING_MODEL=${embedding_model}
+      OLLAMA_MODEL=${ollama_model}
+    append: true
+
+  - path: /etc/ssh/sshd_config.d/harden.conf
+    content: |
+      # SSH Hardening Configuration
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      X11Forwarding no
+      MaxAuthTries 3
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+
+  - path: /etc/needrestart/conf.d/needrestart.conf
+    content: |
+      $nrconf{kernelhints} = -1;
+      $nrconf{restart} = 'a';
+
+  - path: /opt/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "storage-driver": "overlay2",
+        "live-restore": true,
+        "default-ulimits": {
+          "nofile": {
+            "Name": "nofile",
+            "Hard": 65536,
+            "Soft": 65536
+          }
+        }
+      }
+
+  - path: /etc/systemd/system/docker.service.d/override.conf
+    content: |
+      [Service]
+      ExecStartPost=/bin/sh -c "sleep 5 && systemctl restart docker"
+
+# Run commands to set up the system
+runcmd:
+  # Configure UFW firewall
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+
+  # Configure fail2ban
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+
+  # Configure automatic security updates
+  - systemctl enable unattended-upgrades
+  - systemctl start unattended-upgrades
+
+  # Install Docker
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh
+  - usermod -aG docker root
+
+  # Install Docker Compose
+  - curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+  - ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+  # Configure Docker daemon
+  - mkdir -p /etc/docker
+  - cp /opt/docker/daemon.json /etc/docker/daemon.json
+  - systemctl restart docker
+  - systemctl enable docker
+
+  # Create application directories
+  - mkdir -p /opt/kwar-ai/{libby,epidbot,nginx,monitoring,backups}
+  - mkdir -p /opt/kwar-ai/libby/data
+  - mkdir -p /opt/kwar-ai/epidbot/data/{pysus,plots}
+  - mkdir -p /opt/kwar-ai/nginx/ssl
+  - mkdir -p /opt/kwar-ai/backups/{postgres,libby,epidbot}
+  - mkdir -p /var/log/kwar-ai/{nginx,libby,epidbot}
+
+  # Set permissions
+  - chmod -R 755 /opt/kwar-ai
+  - chmod -R 755 /var/log/kwar-ai
+
+  # Create health check script
+  - |
+    cat > /opt/kwar-ai/healthcheck.sh << 'HEALTH_EOF'
+    #!/bin/bash
+    echo "=== Kwar-AI Health Check ==="
+    echo "Date: $(date)"
+    echo ""
+    echo "Docker Containers:"
+    docker ps
+    echo ""
+    echo "EpidBot Health:"
+    curl -sf http://localhost:7860/ > /dev/null && echo "OK" || echo "FAILED"
+    echo ""
+    echo "Libby Health:"
+    curl -sf http://localhost:8000/api/health > /dev/null && echo "OK" || echo "FAILED"
+    echo ""
+    echo "PostgreSQL Health:"
+    docker exec libby-postgres pg_isready -U libby || echo "FAILED"
+    echo ""
+    echo "Disk Usage:"
+    df -h /opt/kwar-ai
+    echo ""
+    echo "Memory Usage:"
+    free -h
+    echo ""
+    echo "Docker Images:"
+    docker images
+    HEALTH_EOF
+  - chmod +x /opt/kwar-ai/healthcheck.sh
+
+  # Create backup script
+  - |
+    cat > /opt/kwar-ai/backup.sh << 'BACKUP_EOF'
+    #!/bin/bash
+    set -e
+    
+    BACKUP_DIR="/opt/kwar-ai/backups"
+    DATE=$(date +%Y%m%d_%H%M%S)
+    RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+    
+    echo "Starting backup at $(date)"
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_DIR/$DATE"
+    
+    # Backup PostgreSQL
+    echo "Backing up PostgreSQL..."
+    docker exec libby-postgres pg_dumpall -U libby | gzip > "$BACKUP_DIR/$DATE/postgres_backup.sql.gz"
+    
+    # Backup Libby data
+    echo "Backing up Libby data..."
+    tar -czf "$BACKUP_DIR/$DATE/libby_data.tar.gz" -C /opt/kwar-ai/libby data
+    
+    # Backup EpidBot data
+    echo "Backing up EpidBot data..."
+    tar -czf "$BACKUP_DIR/$DATE/epidbot_data.tar.gz" -C /opt/kwar-ai/epidbot data
+    
+    # Clean old backups
+    echo "Cleaning old backups..."
+    find "$BACKUP_DIR" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} + 2>/dev/null || true
+    
+    echo "Backup completed at $(date)"
+    echo "Backup location: $BACKUP_DIR/$DATE"
+    BACKUP_EOF
+  - chmod +x /opt/kwar-ai/backup.sh
+
+  # Add backup cron job
+  - echo "0 2 * * * /opt/kwar-ai/backup.sh >> /var/log/kwar-ai/backup.log 2>&1" | crontab -
+
+  # Create deployment marker
+  - echo "Server initialized at $(date)" > /opt/kwar-ai/.initialized
+
+# Final message
+final_message: "Kwar-AI server initialization completed at $TIMESTAMP"

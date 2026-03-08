@@ -1,0 +1,105 @@
+# ============================================
+# Hetzner Cloud Configuration
+# ============================================
+
+# Generate API token at: https://console.hetzner.cloud/projects/YOUR_PROJECT_ID/security/tokens
+# Required permissions: Read & Write
+hcloud_token = "YOUR_HETZNER_API_TOKEN_HERE"
+
+# ============================================
+# Server Configuration
+# ============================================
+
+server_name   = "kwar-ai-server"
+server_type   = "cx42"  # 8 vCPU, 16GB RAM
+location      = "hel1"  # Helsinki data center
+image         = "ubuntu-24.04"
+
+# ============================================
+# Domain Configuration
+# ============================================
+
+domain_name       = "kwar-ai.com.br"
+epidbot_subdomain = "epidbot.kwar-ai.com.br"
+libby_subdomain   = "libby.kwar-ai.com.br"
+grafana_subdomain = "grafana.kwar-ai.com.br"
+
+# ============================================
+# SSH Configuration
+# ============================================
+
+# Option 1: Provide your existing SSH public key
+# ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2E... your-email@example.com"
+
+# Option 2: Leave empty to generate a new key pair (keys will be saved to ./ssh_keys/)
+ssh_public_key = ""
+
+ssh_key_name = "kwar-ai-ssh-key"
+
+# ============================================
+# Admin Configuration
+# ============================================
+
+admin_email = "admin@kwar-ai.com.br"
+
+# ============================================
+# Database Configuration
+# ============================================
+
+postgres_db       = "libby"
+postgres_user     = "libby"
+postgres_password = "CHANGE_ME_GENERATE_A_SECURE_PASSWORD_HERE"
+
+# Generate a secure password:
+# openssl rand -base64 32
+
+# ============================================
+# Application Secrets
+# ============================================
+
+# Generate a secure secret key for sessions
+secret_key = "CHANGE_ME_GENERATE_A_RANDOM_SECRET_KEY"
+
+# Generate with: openssl rand -hex 32
+
+# ============================================
+# API Keys (Leave empty if not used)
+# ============================================
+
+openai_api_key   = "sk-your-openai-api-key-here"
+gemini_api_key   = "your-gemini-api-key-here"
+zhipu_api_key    = "your-zhipu-api-key-here"
+deepseek_api_key = "your-deepseek-api-key-here"
+
+# ============================================
+# OAuth Configuration (Optional)
+# ============================================
+
+github_client_id     = "your-github-client-id"
+github_client_secret = "your-github-client-secret"
+
+# ============================================
+# Backup Configuration
+# ============================================
+
+backup_retention_days = 7
+
+# ============================================
+# Monitoring Configuration
+# ============================================
+
+enable_monitoring      = true
+grafana_admin_password = "CHANGE_ME_GRAFANA_ADMIN_PASSWORD"
+
+# ============================================
+# LLM Configuration
+# ============================================
+
+embedding_model = "mxbai-embed-large"
+ollama_model    = "llama3"
+
+# ============================================
+# Server Settings
+# ============================================
+
+timezone = "America/Sao_Paulo"

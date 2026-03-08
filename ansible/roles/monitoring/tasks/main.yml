@@ -1,0 +1,69 @@
+---
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/kwar-ai/monitoring
+    - /opt/kwar-ai/monitoring/dashboards
+    - /opt/kwar-ai/monitoring/rules
+    - /opt/kwar-ai/secrets
+
+- name: Create Grafana admin password file
+  copy:
+    content: "{{ grafana_admin_password }}"
+    dest: /opt/kwar-ai/secrets/grafana_password.txt
+    mode: '0600'
+  no_log: true
+
+- name: Copy monitoring configuration files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: 'monitoring/prometheus.yml', dest: '/opt/kwar-ai/monitoring/prometheus.yml' }
+    - { src: 'monitoring/alertmanager.yml', dest: '/opt/kwar-ai/monitoring/alertmanager.yml' }
+    - { src: 'monitoring/docker-compose.yml', dest: '/opt/kwar-ai/monitoring/docker-compose.yml' }
+
+- name: Copy alert rules
+  copy:
+    src: monitoring/rules/
+    dest: /opt/kwar-ai/monitoring/rules/
+    mode: '0644'
+
+- name: Copy Grafana dashboards
+  copy:
+    src: monitoring/dashboards/
+    dest: /opt/kwar-ai/monitoring/dashboards/
+    mode: '0644'
+
+- name: Pull monitoring Docker images
+  command: docker-compose -f /opt/kwar-ai/monitoring/docker-compose.yml pull
+  args:
+    chdir: /opt/kwar-ai/monitoring
+  register: pull_result
+  changed_when: "'Downloaded' in pull_result.stdout"
+  failed_when: false
+
+- name: Start monitoring services
+  docker_compose:
+    project_src: /opt/kwar-ai/monitoring
+    state: present
+    restarted: yes
+  register: monitoring_start
+
+- name: Wait for Prometheus to be ready
+  wait_for:
+    host: localhost
+    port: 9090
+    delay: 10
+    timeout: 120
+
+- name: Wait for Grafana to be ready
+  wait_for:
+    host: localhost
+    port: 3000
+    delay: 10
+    timeout: 120

@@ -1,0 +1,56 @@
+---
+- name: Ensure Docker is installed
+  command: docker --version
+  register: docker_version
+  changed_when: false
+  failed_when: false
+
+- name: Install Docker if not present
+  shell: |
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
+  when: docker_version.rc != 0
+
+- name: Ensure Docker service is running
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Install Docker Compose
+  get_url:
+    url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ ansible_system }}-{{ ansible_machine }}"
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+
+- name: Create symlink for docker-compose
+  file:
+    src: /usr/local/bin/docker-compose
+    dest: /usr/bin/docker-compose
+    state: link
+    force: yes
+
+- name: Verify Docker Compose installation
+  command: docker-compose --version
+  register: compose_version
+  changed_when: false
+
+- name: Create Docker network for services
+  docker_network:
+    name: kwar-ai-network
+    state: present
+
+- name: Create application directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/kwar-ai
+    - /opt/kwar-ai/libby
+    - /opt/kwar-ai/epidbot
+    - /opt/kwar-ai/nginx
+    - /opt/kwar-ai/nginx/ssl
+    - /opt/kwar-ai/secrets
+    - /opt/kwar-ai/backups
+    - /var/log/kwar-ai

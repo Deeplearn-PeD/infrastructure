@@ -1,6 +1,6 @@
 services:
   epidbot:
-    build: https://github.com/your-org/EpiDBot.git#main
+    build: https://{{ github_token }}@github.com/DeepLearn-Ped/EpiDBot.git#main
     image: epidbot:latest
     container_name: epidbot
     ports:

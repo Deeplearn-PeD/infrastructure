@@ -23,20 +23,12 @@
     dest: /opt/kwar-ai/epidbot/docker-compose.yml
     mode: '0644'
 
-- name: Pull EpidBot Docker images
-  command: docker-compose -f /opt/kwar-ai/epidbot/docker-compose.yml pull
-  args:
-    chdir: /opt/kwar-ai/epidbot
-  register: pull_result
-  changed_when: "'Downloaded' in pull_result.stdout"
-  failed_when: false
-
-- name: Start EpidBot services
-  command: docker-compose up -d
+- name: Build and start EpidBot services
+  command: docker-compose up -d --build
   args:
     chdir: /opt/kwar-ai/epidbot
   register: epidbot_start
-  changed_when: "'Starting' in epidbot_start.stdout or 'Created' in epidbot_start.stdout"
+  changed_when: "'Creating' in epidbot_start.stdout or 'Starting' in epidbot_start.stdout or 'Built' in epidbot_start.stdout"
 
 - name: Wait for EpidBot to be healthy
   uri:

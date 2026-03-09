@@ -11,36 +11,49 @@ This repository contains the infrastructure code to deploy and manage two AI-pow
 
 ### Architecture
 
+This infrastructure uses a **hybrid deployment strategy**:
+
+- **Main website** (`kwar-ai.com.br`) → GitHub Pages (separate repository)
+- **Applications** (`*.kwar-ai.com.br`) → Hetzner Cloud (this repository)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Internet                              │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-                      ▼
-        ┌─────────────────────────────┐
-        │  Hetzner Cloud Server CX43  │
-        │   (8 vCPU, 16GB RAM)        │
-        │   Helsinki (hel1)           │
-        └──────────┬──────────────────┘
-                   │
-    ┌──────────────┴──────────────────┐
-    │   Nginx Reverse Proxy (443)     │
-    │   - Let's Encrypt SSL           │
-    │   - Rate limiting               │
-    └──────┬──────────────┬───────────┘
-           │              │
-    ┌──────▼──────┐  ┌───▼──────────┐
-    │  EpidBot    │  │    Libby     │
-    │  (7860)     │  │   (8000)     │
-    │  Gradio UI  │  │   RAG API    │
-    └─────────────┘  └───┬──────────┘
-                           │
-              ┌────────────┼─────────────┐
-              │            │             │
-        ┌─────▼────┐  ┌───▼──────┐  ┌──▼───────┐
-        │PostgreSQL│  │  Ollama  │  │Prometheus│
-        │pgvector  │  │  LLM     │  │ Grafana  │
-        └──────────┘  └──────────┘  └──────────┘
+│                  kwar-ai.com.br                          │
+│              (GitHub Pages - Separate)                   │
+│                   185.199.111.153                        │
+└─────────────────────────────────────────────────────────┘
+                        │
+                        │ Separate Infrastructure
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│         Hetzner Cloud Server CX43 (This Repo)            │
+│              (8 vCPU, 16GB RAM, Helsinki)                │
+│                                                            │
+│  ┌──────────────────────────────────────────────┐       │
+│  │   Nginx Reverse Proxy (443)                  │       │
+│  │   - Let's Encrypt SSL                        │       │
+│  │   - Rate limiting                            │       │
+│  └──────┬───────────────────────┬──────────────┘       │
+│         │                      │                        │
+│  ┌──────▼──────┐         ┌────▼──────────┐            │
+│  │  EpidBot    │         │    Libby      │            │
+│  │  (7860)     │         │   (8000)      │            │
+│  │  Gradio UI  │         │   RAG API     │            │
+│  └─────────────┘         └───┬───────────┘            │
+│                              │                          │
+│                 ┌────────────┼────────────┐            │
+│                 │            │            │            │
+│           ┌─────▼────┐ ┌────▼─────┐ ┌───▼──────┐      │
+│           │PostgreSQL│ │  Ollama  │ │Prometheus│      │
+│           │pgvector  │ │   LLM    │ │ Grafana  │      │
+│           └──────────┘ └──────────┘ └──────────┘      │
+│                                                        │
+│  Deployed via: GitHub Actions (This Repository)        │
+└────────────────────────────────────────────────────────┘
+
+GitHub Actions Workflow:
+  Push → Validate → Deploy to Hetzner → Health Check
+  (Does NOT touch GitHub Pages website)
 ```
 
 ## 🚀 Features

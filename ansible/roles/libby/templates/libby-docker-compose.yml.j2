@@ -23,7 +23,7 @@ services:
       - kwar-ai-network
 
   libby-api:
-    build: https://github.com/your-org/libby.git#main
+    build: {{ libby_repo_url | default('https://github.com/DeepLearn-Ped/libby.git') }}{{ libby_repo_branch | default('#main') }}
     image: libby-api:latest
     container_name: libby-api
     depends_on:

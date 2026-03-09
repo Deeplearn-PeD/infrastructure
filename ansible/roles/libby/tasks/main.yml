@@ -28,19 +28,12 @@
     dest: /opt/kwar-ai/libby/docker/init-db.sql
     mode: '0644'
 
-- name: Pull Libby Docker images
-  command: docker-compose -f /opt/kwar-ai/libby/docker-compose.yml pull
-  args:
-    chdir: /opt/kwar-ai/libby
-  register: pull_result
-  changed_when: "'Downloaded' in pull_result.stdout"
-
-- name: Start Libby services
-  command: docker-compose up -d
+- name: Build and start Libby services
+  command: docker-compose up -d --build
   args:
     chdir: /opt/kwar-ai/libby
   register: libby_start
-  changed_when: "'Starting' in libby_start.stdout or 'Created' in libby_start.stdout"
+  changed_when: "'Creating' in libby_start.stdout or 'Starting' in libby_start.stdout or 'Built' in libby_start.stdout"
 
 - name: Wait for PostgreSQL to be ready
   wait_for:

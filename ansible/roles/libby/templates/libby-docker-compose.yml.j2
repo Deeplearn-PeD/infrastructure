@@ -8,19 +8,43 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - postgres-backups:/backups
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init-pgvector.sql:ro
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-libby} -d ${POSTGRES_DB:-libby} && psql -U ${POSTGRES_USER:-libby} -d ${POSTGRES_DB:-libby} -c \"SELECT 1 FROM pg_extension WHERE extname='vector'\" | grep -q 1"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-libby} -d ${POSTGRES_DB:-libby}
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - kwar-ai-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: libby-ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - ollama list || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
       start_period: 60s
     restart: unless-stopped
     networks:
       - kwar-ai-network
+{% if ollama_gpu_enabled | default(false) %}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+{% endif %}
 
   libby-api:
     build: {{ libby_repo_url | default('https://github.com/DeepLearn-Ped/libby.git') }}{{ libby_repo_branch | default('#main') }}
@@ -29,22 +53,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
       - libby-data:/data
-      - ollama-models:/root/.ollama
-      - ./data:/data/documents:ro
     environment:
       - EMBED_DB=postgresql://${POSTGRES_USER:-libby}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-libby}
       - COLLECTION_NAME=main
-      - OLLAMA_HOST=http://localhost:11434
+      - OLLAMA_HOST=http://libby-ollama:11434
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-mxbai-embed-large}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8000/api/health
       interval: 30s
       timeout: 10s
       retries: 3
@@ -67,7 +95,10 @@ services:
       - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
     volumes:
       - postgres-backups:/backups
-    entrypoint: ["/bin/sh", "-c", "while true; do pg_dump -h $$POSTGRES_HOST -U $$POSTGRES_USER $$POSTGRES_DB | gzip > /backups/backup_$(date +%Y%m%d_%H%M%S).sql.gz && find /backups -name '*.sql.gz' -mtime +$$BACKUP_RETENTION_DAYS -delete && sleep 86400; done"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - while true; do pg_dump -h $$POSTGRES_HOST -U $$POSTGRES_USER $$POSTGRES_DB | gzip > /backups/backup_$(date +%Y%m%d_%H%M%S).sql.gz && find /backups -name '*.sql.gz' -mtime +$$BACKUP_RETENTION_DAYS -delete && sleep 86400; done
     restart: unless-stopped
     networks:
       - kwar-ai-network

@@ -541,6 +541,9 @@ journalctl -u docker
 
 ## 📚 Additional Resources
 
+- **[GitHub Actions CI/CD Guide](GITHUB_ACTIONS.md)** - Complete documentation of the automated deployment pipeline
+- [Quick Start Guide](QUICKSTART.md) - 30-minute deployment guide
+- [Changelog](CHANGELOG.md) - Version history and updates
 - [OpenTofu Documentation](https://opentofu.org/docs/)
 - [Hetzner Cloud API](https://docs.hetzner.cloud/)
 - [Ansible Documentation](https://docs.ansible.com/)

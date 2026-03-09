@@ -37,12 +37,21 @@
   register: epidbot_start
   changed_when: "'Creating' in epidbot_start.stdout or 'Starting' in epidbot_start.stdout or 'Built' in epidbot_start.stdout"
 
-- name: Wait for EpidBot to be healthy
+- name: Wait for EpidBot container to be running
+  command: docker inspect --format='{{.State.Status}}' epidbot
+  register: epidbot_status
+  retries: 30
+  delay: 10
+  until: epidbot_status.stdout == 'running'
+  failed_when: false
+
+- name: Wait for EpidBot to be healthy (may take time on first start)
   uri:
     url: http://localhost:7860/
     method: GET
     status_code: 200
   register: result
-  retries: 30
+  retries: 60
   delay: 10
   until: result.status == 200
+  failed_when: false

@@ -58,7 +58,9 @@ services:
       - GF_ALERTING_ENABLED=true
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./dashboards:/etc/grafana/provisioning/dashboards
+      - ./dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./dashboards/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
     secrets:
       - grafana_password
     ports:

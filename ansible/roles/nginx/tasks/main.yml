@@ -1,16 +1,14 @@
 ---
-- name: Create Nginx configuration directory
+- name: Create Nginx directories
   file:
-    path: /opt/kwar-ai/nginx
+    path: "{{ item }}"
     state: directory
     mode: '0755'
-
-- name: Copy Nginx configuration
-  template:
-    src: nginx.conf.j2
-    dest: /opt/kwar-ai/nginx/nginx.conf
-    mode: '0644'
-  notify: Restart Nginx
+  loop:
+    - /opt/kwar-ai/nginx
+    - /opt/kwar-ai/nginx/ssl
+    - /var/log/nginx
+    - /var/www/certbot
 
 - name: Check if SSL certificates exist
   stat:
@@ -25,35 +23,12 @@
     update_cache: yes
   when: not ssl_cert.stat.exists
 
-- name: Obtain SSL certificates with Certbot
-  shell: |
-    certbot certonly --standalone \
-      -d {{ epidbot_subdomain }} \
-      -d {{ libby_subdomain }} \
-      {% if enable_monitoring %}-d {{ grafana_subdomain }} {% endif %} \
-      --non-interactive --agree-tos --email {{ admin_email }} \
-      --pre-hook "docker stop nginx-proxy 2>/dev/null || true" \
-      --post-hook "docker start nginx-proxy 2>/dev/null || true"
-  args:
-    creates: /etc/letsencrypt/live/{{ epidbot_subdomain }}/fullchain.pem
+- name: Copy HTTP-only Nginx config (for certbot)
+  template:
+    src: nginx-http-only.conf.j2
+    dest: /opt/kwar-ai/nginx/nginx.conf
+    mode: '0644'
   when: not ssl_cert.stat.exists
-
-- name: Copy SSL certificates to Nginx directory
-  shell: |
-    cp /etc/letsencrypt/live/{{ epidbot_subdomain }}/fullchain.pem /opt/kwar-ai/nginx/ssl/
-    cp /etc/letsencrypt/live/{{ epidbot_subdomain }}/privkey.pem /opt/kwar-ai/nginx/ssl/
-    chmod 644 /opt/kwar-ai/nginx/ssl/*.pem
-  when: not ssl_cert.stat.exists
-
-- name: Set up certificate renewal cron job
-  cron:
-    name: "Renew SSL certificates"
-    job: "certbot renew --quiet --post-hook 'cp /etc/letsencrypt/live/{{ epidbot_subdomain }}/*.pem /opt/kwar-ai/nginx/ssl/ && docker restart nginx-proxy 2>/dev/null || true'"
-    minute: "0"
-    hour: "0"
-    day: "1"
-    month: "*"
-    weekday: "*"
 
 - name: Pull Nginx Docker image
   docker_image:
@@ -61,7 +36,70 @@
     tag: alpine
     source: pull
 
-- name: Start Nginx container
+- name: Start Nginx container (HTTP-only for certbot)
+  docker_container:
+    name: nginx-proxy
+    image: nginx:alpine
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/kwar-ai/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /var/log/nginx:/var/log/nginx
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - name: kwar-ai-network
+  when: not ssl_cert.stat.exists
+
+- name: Wait for Nginx to be ready
+  wait_for:
+    port: 80
+    host: 127.0.0.1
+    delay: 2
+    timeout: 30
+  when: not ssl_cert.stat.exists
+
+- name: Obtain SSL certificates with Certbot (webroot)
+  shell: |
+    certbot certonly --webroot \
+      -w /var/www/certbot \
+      -d {{ epidbot_subdomain }} \
+      -d {{ libby_subdomain }} \
+      {% if enable_monitoring %}-d {{ grafana_subdomain }} {% endif %} \
+      --non-interactive --agree-tos --email {{ admin_email }}
+  when: not ssl_cert.stat.exists
+  ignore_errors: yes
+  register: certbot_result
+
+- name: Find certificate directory
+  shell: |
+    if [ -d "/etc/letsencrypt/live/{{ epidbot_subdomain }}" ]; then
+      echo "{{ epidbot_subdomain }}"
+    elif [ -d "/etc/letsencrypt/live/{{ epidbot_subdomain }}-0001" ]; then
+      echo "{{ epidbot_subdomain }}-0001"
+    else
+      ls -d /etc/letsencrypt/live/{{ epidbot_subdomain }}* 2>/dev/null | head -1 | xargs basename
+    fi
+  register: cert_dir
+  changed_when: false
+
+- name: Copy SSL certificates to Nginx directory
+  shell: |
+    cp /etc/letsencrypt/live/{{ cert_dir.stdout }}/fullchain.pem /opt/kwar-ai/nginx/ssl/
+    cp /etc/letsencrypt/live/{{ cert_dir.stdout }}/privkey.pem /opt/kwar-ai/nginx/ssl/
+    chmod 644 /opt/kwar-ai/nginx/ssl/*.pem
+  when: not ssl_cert.stat.exists and cert_dir.stdout != ""
+
+- name: Copy full Nginx configuration (with SSL)
+  template:
+    src: nginx.conf.j2
+    dest: /opt/kwar-ai/nginx/nginx.conf
+    mode: '0644'
+  notify: Restart Nginx
+
+- name: Start Nginx container (full config with SSL)
   docker_container:
     name: nginx-proxy
     image: nginx:alpine
@@ -74,10 +112,23 @@
       - /opt/kwar-ai/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /opt/kwar-ai/nginx/ssl:/etc/nginx/ssl:ro
       - /var/log/nginx:/var/log/nginx
+      - /var/www/certbot:/var/www/certbot:ro
     networks:
       - name: kwar-ai-network
+      - name: monitoring_monitoring-network
+    networks_cli_compatible: yes
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+- name: Set up certificate renewal cron job
+  cron:
+    name: "Renew SSL certificates"
+    job: "certbot renew --quiet --webroot -w /var/www/certbot --post-hook 'cp /etc/letsencrypt/live/{{ epidbot_subdomain }}*/fullchain.pem /opt/kwar-ai/nginx/ssl/ && cp /etc/letsencrypt/live/{{ epidbot_subdomain }}*/privkey.pem /opt/kwar-ai/nginx/ssl/ && docker restart nginx-proxy 2>/dev/null || true'"
+    minute: "0"
+    hour: "0"
+    day: "1"
+    month: "*"
+    weekday: "*"

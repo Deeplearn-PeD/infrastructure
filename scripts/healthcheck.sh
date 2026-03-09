@@ -4,6 +4,11 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+cd "$PROJECT_ROOT"
+
 echo "=== Kwar-AI Health Check ==="
 echo "Date: $(date)"
 echo ""
@@ -16,6 +21,7 @@ if [ ! -f "ansible/inventory.ini" ]; then
 fi
 
 SERVER_IP=$(grep -oP '\d+\.\d+\.\d+\.\d+' ansible/inventory.ini | head -1)
+SSH_KEY="ssh_keys/kwar-ai-ssh-key"
 
 if [ -z "$SERVER_IP" ]; then
     echo "ERROR: Could not find server IP in inventory"
@@ -27,7 +33,7 @@ echo ""
 
 # Check SSH connectivity
 echo "1. Checking SSH connectivity..."
-if ssh -o ConnectTimeout=5 -o BatchMode=yes root@$SERVER_IP "echo 'OK'" &>/dev/null; then
+if ssh -i "$SSH_KEY" -o ConnectTimeout=5 -o BatchMode=yes -o StrictHostKeyChecking=no root@$SERVER_IP "echo 'OK'" &>/dev/null; then
     echo "   ✓ SSH connection: OK"
 else
     echo "   ✗ SSH connection: FAILED"
@@ -37,7 +43,7 @@ echo ""
 
 # Check Docker containers
 echo "2. Checking Docker containers..."
-ssh root@$SERVER_IP "docker ps --format 'table {{.Names}}\t{{.Status}}'" 2>/dev/null || echo "   ✗ Could not retrieve container status"
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@$SERVER_IP "docker ps --format 'table {{.Names}}\t{{.Status}}'" 2>/dev/null || echo "   ✗ Could not retrieve container status"
 echo ""
 
 # Check EpidBot
@@ -62,7 +68,7 @@ echo ""
 
 # Check PostgreSQL
 echo "5. Checking PostgreSQL..."
-ssh root@$SERVER_IP "docker exec libby-postgres pg_isready -U libby" 2>/dev/null && echo "   ✓ PostgreSQL: OK" || echo "   ✗ PostgreSQL: FAILED"
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@$SERVER_IP "docker exec libby-postgres pg_isready -U libby" 2>/dev/null && echo "   ✓ PostgreSQL: OK" || echo "   ✗ PostgreSQL: FAILED"
 echo ""
 
 # Check SSL certificates
@@ -73,12 +79,12 @@ echo ""
 
 # Check disk usage
 echo "7. Checking disk usage..."
-ssh root@$SERVER_IP "df -h /opt/kwar-ai" 2>/dev/null || echo "   ✗ Could not retrieve disk usage"
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@$SERVER_IP "df -h /opt/kwar-ai" 2>/dev/null || echo "   ✗ Could not retrieve disk usage"
 echo ""
 
 # Check memory usage
 echo "8. Checking memory usage..."
-ssh root@$SERVER_IP "free -h" 2>/dev/null || echo "   ✗ Could not retrieve memory usage"
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@$SERVER_IP "free -h" 2>/dev/null || echo "   ✗ Could not retrieve memory usage"
 echo ""
 
 echo "=== Health check completed ==="

@@ -55,11 +55,18 @@ http {
     }
     {% endif %}
 
-    # Redirect HTTP to HTTPS
+    # HTTP server for ACME challenges and redirect
     server {
         listen 80;
         server_name {{ domain_name }} {{ epidbot_subdomain }} {{ libby_subdomain }} {% if enable_monitoring %}{{ grafana_subdomain }}{% endif %};
-        return 301 https://$host$request_uri;
+
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
     }
 
     # EpidBot Server

@@ -7,6 +7,13 @@
   loop:
     - /opt/kwar-ai/epidbot
     - /opt/kwar-ai/epidbot/data
+
+- name: Create EpidBot data directories with write permissions
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0777'
+  loop:
     - /opt/kwar-ai/epidbot/data/pysus
     - /opt/kwar-ai/epidbot/data/plots
 

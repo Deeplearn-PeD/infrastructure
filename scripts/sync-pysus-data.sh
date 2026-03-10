@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sync PySUS data to Hetzner server
-# Uploads parquet files from local ~/pysus to epidbot data directory
+# Uploads parquet files from local pysus to epidbot data directory
 
 set -e
 
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Configuration
-LOCAL_PYSUS="${HOME}/pysus"
+DEFAULT_LOCAL_PYSUS="${HOME}/pysus"
 SERVER_USER="root"
 SERVER_IP="204.168.149.153"
 REMOTE_PYSUS="/opt/kwar-ai/epidbot/data/pysus"
@@ -25,6 +25,29 @@ echo "PySUS Data Sync to Hetzner"
 echo "=================================="
 echo ""
 
+# Ask for source path
+echo "Select PySUS data source:"
+echo "1) Default path: ${DEFAULT_LOCAL_PYSUS}"
+echo "2) Custom path"
+echo ""
+read -p "Enter choice (1 or 2) [default: 1]: " -n 1 -r
+echo ""
+
+if [[ -z "$REPLY" || "$REPLY" == "1" ]]; then
+    LOCAL_PYSUS="$DEFAULT_LOCAL_PYSUS"
+    echo "Using default path: $LOCAL_PYSUS"
+elif [[ "$REPLY" == "2" ]]; then
+    read -p "Enter custom PySUS path: " LOCAL_PYSUS
+    # Expand ~ if present
+    LOCAL_PYSUS="${LOCAL_PYSUS/#\~/$HOME}"
+    echo "Using custom path: $LOCAL_PYSUS"
+else
+    echo -e "${RED}Invalid choice. Exiting.${NC}"
+    exit 1
+fi
+
+echo ""
+
 # Check if local pysus directory exists
 if [ ! -d "$LOCAL_PYSUS" ]; then
     echo -e "${RED}ERROR: Local PySUS directory not found: $LOCAL_PYSUS${NC}"
@@ -37,17 +60,36 @@ if [ ! -f "$SSH_KEY" ]; then
     exit 1
 fi
 
-# Count local parquet files
+# Count local files recursively
 PARQUET_COUNT=$(find "$LOCAL_PYSUS" -name "*.parquet" -type f | wc -l)
+DUCKDB_COUNT=$(find "$LOCAL_PYSUS" -name "*.duckdb" -type f | wc -l)
+DUCKDB_WAL_COUNT=$(find "$LOCAL_PYSUS" -name "*.duckdb.wal" -type f | wc -l)
 
-if [ "$PARQUET_COUNT" -eq 0 ]; then
-    echo -e "${YELLOW}WARNING: No parquet files found in $LOCAL_PYSUS${NC}"
+TOTAL_FILES=$((PARQUET_COUNT + DUCKDB_COUNT + DUCKDB_WAL_COUNT))
+
+if [ "$TOTAL_FILES" -eq 0 ]; then
+    echo -e "${YELLOW}WARNING: No parquet or duckdb files found in $LOCAL_PYSUS${NC}"
+    echo "Searched recursively in: $LOCAL_PYSUS"
     exit 0
 fi
 
 echo "Local PySUS directory: $LOCAL_PYSUS"
 echo "Remote destination: ${SERVER_USER}@${SERVER_IP}:${REMOTE_PYSUS}"
-echo "Parquet files found: $PARQUET_COUNT"
+echo ""
+echo "Files found (recursive scan):"
+echo "  - Parquet files:  $PARQUET_COUNT"
+echo "  - DuckDB files:   $DUCKDB_COUNT"
+echo "  - DuckDB WAL:     $DUCKDB_WAL_COUNT"
+echo "  - Total:          $TOTAL_FILES"
+echo ""
+
+# Show directory structure
+echo "Directory structure:"
+find "$LOCAL_PYSUS" -type d | head -20 | sed 's/^/  /'
+DIR_COUNT=$(find "$LOCAL_PYSUS" -type d | wc -l)
+if [ "$DIR_COUNT" -gt 20 ]; then
+    echo "  ... and $((DIR_COUNT - 20)) more directories"
+fi
 echo ""
 
 # Calculate total size

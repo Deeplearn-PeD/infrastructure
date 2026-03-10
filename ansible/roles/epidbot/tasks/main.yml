@@ -38,7 +38,7 @@
   changed_when: "'Creating' in epidbot_start.stdout or 'Starting' in epidbot_start.stdout or 'Built' in epidbot_start.stdout"
 
 - name: Wait for EpidBot container to be running
-  command: docker inspect --format='{{.State.Status}}' epidbot
+  command: docker inspect --format={% raw %}'{{.State.Status}}'{% endraw %} epidbot
   register: epidbot_status
   retries: 30
   delay: 10

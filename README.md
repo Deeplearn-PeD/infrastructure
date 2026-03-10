@@ -176,6 +176,7 @@ Note: You'll get the `<SERVER_IP>` from the output of step 4.
 Wait for DNS propagation (5-30 minutes), then:
 
 ```bash
+# Deploy all services
 ./scripts/deploy-services.sh
 ```
 
@@ -189,6 +190,29 @@ This command will connect to your server and **REMOTELY** execute:
 7. Start all services with health checks
 
 All of this happens **automatically on the remote server** via Ansible.
+
+#### Deploy Specific Services
+
+You can also deploy individual services:
+
+```bash
+# Deploy only EpidBot
+./scripts/deploy-services.sh epidbot
+
+# Deploy only Libby
+./scripts/deploy-services.sh libby
+
+# Deploy only Nginx (reverse proxy)
+./scripts/deploy-services.sh nginx
+
+# Deploy only monitoring (Prometheus + Grafana)
+./scripts/deploy-services.sh monitoring
+
+# Deploy only Docker (base infrastructure)
+./scripts/deploy-services.sh docker
+```
+
+Available services: `docker`, `nginx`, `libby`, `epidbot`, `monitoring`
 
 ### 7. Verify Deployment 💻
 
@@ -233,7 +257,8 @@ kwarai-infra/
 ├── scripts/
 │   ├── setup-hetzner-api.sh   # API token setup helper
 │   ├── deploy.sh              # Infrastructure deployment
-│   ├── deploy-services.sh     # Service deployment
+│   ├── deploy-services.sh     # Service deployment (supports: all, epidbot, libby, nginx, monitoring, docker)
+│   ├── sync-pysus-data.sh     # Sync PySUS data from local to server
 │   ├── healthcheck.sh         # Health monitoring
 │   ├── backup.sh              # Backup automation
 │   └── destroy.sh             # Infrastructure cleanup
@@ -326,6 +351,23 @@ Alerts are configured for:
 Alerts are sent via email to the configured `admin_email`.
 
 ## 💾 Backup & Recovery
+
+### Data Sync
+
+**PySUS Data Sync** 💻
+
+Sync local PySUS data to the server:
+
+```bash
+# Sync parquet files from ~/pysus to server
+./scripts/sync-pysus-data.sh
+```
+
+This script:
+- Syncs `.parquet`, `.duckdb`, and `.duckdb.wal` files
+- Preserves directory structure
+- Shows progress and total size
+- Optionally restarts epidbot after sync
 
 ### Automated Backups
 
@@ -562,6 +604,51 @@ journalctl -u docker
 - [Ansible Documentation](https://docs.ansible.com/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 - [Nginx Documentation](https://nginx.org/en/docs/)
+
+## 🔧 Useful Commands
+
+### Service Management 💻
+
+**Execute on: Local Machine**
+
+```bash
+# Deploy all services
+./scripts/deploy-services.sh
+
+# Deploy specific service
+./scripts/deploy-services.sh epidbot
+./scripts/deploy-services.sh libby
+./scripts/deploy-services.sh nginx
+./scripts/deploy-services.sh monitoring
+
+# Check service health
+./scripts/healthcheck.sh
+
+# Sync PySUS data to server
+./scripts/sync-pysus-data.sh
+```
+
+### Remote Server Commands 💻 → 🖥️
+
+**Execute on: Local Machine** (runs on Remote Server)
+
+```bash
+# SSH into server
+ssh -i ./ssh_keys/kwar-ai-ssh-key root@<SERVER_IP>
+
+# On REMOTE SERVER: View container status
+docker ps
+
+# On REMOTE SERVER: View logs
+docker logs -f epidbot
+docker logs -f libby-api
+docker logs -f nginx-proxy
+
+# On REMOTE SERVER: Restart services
+cd /opt/kwar-ai/epidbot && docker-compose restart
+cd /opt/kwar-ai/libby && docker-compose restart
+docker restart nginx-proxy
+```
 
 ## 🤝 Contributing
 

@@ -3,6 +3,14 @@ set -e
 
 CONTAINER_NAME="epidbot"
 WORKDIR="/opt/kwar-ai/epidbot"
+REMOTE_HOST="204.168.149.153"
+SSH_USER="${SSH_USER:-root}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SSH_KEY="${SSH_KEY:-${SCRIPT_DIR}/../ssh_keys/kwar-ai-ssh-key}"
+
+ssh_cmd() {
+    ssh -i "${SSH_KEY}" "${SSH_USER}@${REMOTE_HOST}" "$@"
+}
 
 usage() {
     echo "EpidBot User Management"
@@ -25,14 +33,18 @@ usage() {
     echo "  $0 passwd admin"
     echo "  $0 delete researcher"
     echo ""
-    echo "Note: Commands run inside the epidbot Docker container"
+    echo "Note: Commands run on remote host ${REMOTE_HOST} inside the epidbot Docker container"
+    echo ""
+    echo "Environment variables:"
+    echo "  SSH_USER  - SSH user (default: root)"
+    echo "  SSH_KEY   - SSH private key path (default: ${SCRIPT_DIR}/../ssh_keys/kwar-ai-ssh-key)"
     exit 1
 }
 
 check_container() {
-    if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-        echo "Error: EpidBot container is not running"
-        echo "Start it with: cd ${WORKDIR} && docker-compose up -d"
+    if ! ssh_cmd "docker ps --format '{{.Names}}' | grep -q \"^${CONTAINER_NAME}\$\""; then
+        echo "Error: EpidBot container is not running on ${REMOTE_HOST}"
+        echo "Start it with: ssh -i ${SSH_KEY} ${SSH_USER}@${REMOTE_HOST} 'cd ${WORKDIR} && docker-compose up -d'"
         exit 1
     fi
 }
@@ -41,7 +53,7 @@ cmd_list() {
     check_container
     echo "Listing EpidBot users..."
     echo ""
-    docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py list
+    ssh_cmd "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py list"
 }
 
 cmd_create() {
@@ -58,10 +70,10 @@ cmd_create() {
     echo "Creating user: $user ($email)"
     echo "You will be prompted for a password..."
     echo ""
-    docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py create-admin << EOF
+    ssh_cmd -t "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py create-admin << EOF
 ${user}
 ${email}
-EOF
+EOF"
 }
 
 cmd_create_with_password() {
@@ -77,12 +89,12 @@ cmd_create_with_password() {
     fi
     
     echo "Creating user: $user ($email)..."
-    docker exec -i ${CONTAINER_NAME} uv run python auth_cli.py create-admin << EOF
+    ssh_cmd "docker exec -i ${CONTAINER_NAME} uv run python auth_cli.py create-admin << EOF
 ${user}
 ${password}
 ${password}
 ${email}
-EOF
+EOF"
     echo "User created successfully!"
 }
 
@@ -97,7 +109,7 @@ cmd_passwd() {
     fi
     
     echo "Changing password for user: $user"
-    docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py passwd "$user"
+    ssh_cmd -t "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py passwd \"$user\""
 }
 
 cmd_delete() {
@@ -114,7 +126,7 @@ cmd_delete() {
     read -p "Are you sure? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py delete "$user"
+        ssh_cmd "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py delete \"$user\""
         echo "User deleted."
     else
         echo "Cancelled."
@@ -125,7 +137,7 @@ cmd_show_credentials() {
     check_container
     echo "Default admin credentials:"
     echo ""
-    docker exec ${CONTAINER_NAME} cat /data/.admin_credentials 2>/dev/null || {
+    ssh_cmd "docker exec ${CONTAINER_NAME} cat /data/.admin_credentials 2>/dev/null" || {
         echo "No credentials file found (may have been deleted or not yet created)"
     }
 }

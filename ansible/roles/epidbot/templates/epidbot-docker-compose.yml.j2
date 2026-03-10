@@ -16,6 +16,9 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - LIBBY_URL=http://libby-api:8000
       - OLLAMA_HOST=http://libby-ollama:11434
+      - EPIDBOT_ADMIN_USER={{ epidbot_admin_user }}
+      - EPIDBOT_ADMIN_PASSWORD={{ epidbot_admin_password }}
+      - EPIDBOT_ADMIN_EMAIL={{ epidbot_admin_email }}
     restart: unless-stopped
     deploy:
       resources:

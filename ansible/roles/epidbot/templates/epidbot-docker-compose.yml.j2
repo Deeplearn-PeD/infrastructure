@@ -9,8 +9,6 @@ services:
       - epidbot_data:/data
       - ./data/pysus:/data/pysus
       - ./data/plots:/data/plots
-    env_file:
-      - .env
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ZHIPU_API_KEY=${ZHIPU_API_KEY}
@@ -18,8 +16,6 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - LIBBY_URL=http://libby-api:8000
       - OLLAMA_HOST=http://libby-ollama:11434
-      - PYSUS_PATH=/data/pysus
-      - PLOT_DIR=/data/plots
     restart: unless-stopped
     deploy:
       resources:
@@ -39,8 +35,8 @@ services:
         - http://localhost:7860/
       interval: 30s
       timeout: 10s
-      retries: 10
-      start_period: 120s
+      retries: 3
+      start_period: 60s
 
 volumes:
   epidbot_data:

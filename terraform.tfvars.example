@@ -10,10 +10,46 @@ hcloud_token = "YOUR_HETZNER_API_TOKEN_HERE"
 # Server Configuration
 # ============================================
 
-server_name   = "kwar-ai-server"
-server_type   = "cx43"  # 8 vCPU, 16GB RAM (Intel Ice Lake)
-location      = "hel1"  # Helsinki data center
-image         = "ubuntu-24.04"
+server_name = "kwar-ai-server"
+server_type = "cx43"  # 8 vCPU, 16GB RAM
+location    = "hel1"  # Helsinki data center
+image       = "ubuntu-24.04"
+
+# SERVER TYPE OPTIONS (see SCALING.md for full list):
+#
+# Shared vCPU (Best Value):
+#   cx23  - 2 vCPU,  4 GB RAM   - 4 EUR/mo  (dev/test)
+#   cpx21 - 3 vCPU,  4 GB RAM   - 9 EUR/mo  (small workloads)
+#   cpx31 - 4 vCPU,  8 GB RAM   - 15 EUR/mo (light production)
+#   cx43  - 8 vCPU, 16 GB RAM   - 17 EUR/mo (recommended)
+#   cpx51 - 16 vCPU, 32 GB RAM  - 54 EUR/mo (scale-up)
+#
+# Dedicated vCPU (Consistent Performance):
+#   ccx23 - 4 vCPU, 16 GB RAM   - 30 EUR/mo (production)
+#   ccx33 - 8 vCPU, 32 GB RAM   - 60 EUR/mo (high-traffic)
+#   ccx43 - 16 vCPU, 64 GB RAM  - 120 EUR/mo (large-scale)
+
+# LOCATION OPTIONS:
+#   hel1 - Helsinki, Finland (EU) - 20TB free traffic [RECOMMENDED]
+#   nbg1 - Nuremberg, Germany (EU) - 20TB free traffic
+#   fsn1 - Falkenstein, Germany (EU) - 20TB free traffic
+#   ash  - Ashburn, VA, USA - 1TB free traffic
+#   hil  - Hillsboro, OR, USA - 1TB free traffic
+#   sin  - Singapore (APAC) - 0.5TB free traffic
+
+# ============================================
+# Volume Configuration (Optional Overrides)
+# ============================================
+# Default sizes are set in modules/volumes/variables.tf
+# Uncomment and modify these to scale storage:
+
+# postgres_volume_size     = 50   # GB - PostgreSQL data (default: 50)
+# libby_volume_size        = 20   # GB - Ollama models + embeddings (default: 20)
+# epidbot_volume_size      = 20   # GB - Chat history + pysus + plots (default: 20)
+# backup_volume_size       = 100  # GB - Backup storage (default: 100)
+# monitoring_volume_size   = 10   # GB - Prometheus/Grafana data (default: 10)
+
+# STORAGE COST: 0.05 EUR/GB/month
 
 # ============================================
 # Domain Configuration

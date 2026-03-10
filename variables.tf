@@ -11,15 +11,38 @@ variable "server_name" {
 }
 
 variable "server_type" {
-  description = "Hetzner server type (CX43 recommended)"
+  description = "Hetzner server type"
   type        = string
-  default     = "cx43"  # 8 vCPU, 16GB RAM (Intel Ice Lake)
+  default     = "cx43"
+
+  # SCALING OPTIONS (Shared vCPU - Best Value):
+  # cx23  - 2 vCPU,  4 GB RAM,  40 GB SSD   - €4/mo  (dev/test)
+  # cpx21 - 3 vCPU,  4 GB RAM,  80 GB SSD   - €9/mo  (small workloads)
+  # cpx31 - 4 vCPU,  8 GB RAM, 160 GB SSD   - €15/mo (light production)
+  # cx43  - 8 vCPU, 16 GB RAM, 160 GB SSD   - €17/mo (recommended - current)
+  # cpx51 - 16 vCPU, 32 GB RAM, 360 GB SSD  - €54/mo (scale-up option)
+  #
+  # DEDICATED OPTIONS (Consistent Performance - Production):
+  # ccx13 - 2 vCPU,  8 GB RAM,  80 GB SSD   - €15/mo
+  # ccx23 - 4 vCPU, 16 GB RAM, 160 GB SSD   - €30/mo
+  # ccx33 - 8 vCPU, 32 GB RAM, 240 GB SSD   - €60/mo
+  # ccx43 - 16 vCPU, 64 GB RAM, 360 GB SSD  - €120/mo
+  # ccx53 - 32 vCPU, 128 GB RAM, 600 GB SSD - €240/mo
+  # ccx63 - 48 vCPU, 192 GB RAM, 960 GB SSD - €480/mo (max)
 }
 
 variable "location" {
   description = "Hetzner data center location"
   type        = string
   default     = "hel1"
+
+  # LOCATION OPTIONS:
+  # nbg1 - Nuremberg, Germany (EU) - 20TB free traffic
+  # fsn1 - Falkenstein, Germany (EU) - 20TB free traffic
+  # hel1 - Helsinki, Finland (EU) - 20TB free traffic [RECOMMENDED]
+  # ash  - Ashburn, VA, USA - 1TB free traffic
+  # hil  - Hillsboro, OR, USA - 1TB free traffic
+  # sin  - Singapore (APAC) - 0.5TB free traffic
 }
 
 variable "image" {
@@ -168,4 +191,34 @@ variable "timezone" {
   description = "Server timezone"
   type        = string
   default     = "America/Sao_Paulo"
+}
+
+variable "postgres_volume_size" {
+  description = "Size of PostgreSQL volume in GB"
+  type        = number
+  default     = 50
+}
+
+variable "libby_volume_size" {
+  description = "Size of Libby data volume in GB"
+  type        = number
+  default     = 20
+}
+
+variable "epidbot_volume_size" {
+  description = "Size of EpidBot data volume in GB"
+  type        = number
+  default     = 20
+}
+
+variable "backup_volume_size" {
+  description = "Size of backup volume in GB"
+  type        = number
+  default     = 100
+}
+
+variable "monitoring_volume_size" {
+  description = "Size of monitoring data volume in GB"
+  type        = number
+  default     = 10
 }

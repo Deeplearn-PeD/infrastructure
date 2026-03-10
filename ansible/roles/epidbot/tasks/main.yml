@@ -16,7 +16,6 @@
   loop:
     - /opt/kwar-ai/epidbot/data/pysus
     - /opt/kwar-ai/epidbot/data/plots
-    - /opt/kwar-ai/epidbot/data/reports
 
 - name: Create EpidBot environment file
   template:

@@ -21,6 +21,12 @@ module "volumes" {
   server_name     = var.server_name
   labels          = local.common_tags
   enable_backups  = true
+
+  postgres_volume_size   = var.postgres_volume_size
+  libby_volume_size      = var.libby_volume_size
+  epidbot_volume_size    = var.epidbot_volume_size
+  backup_volume_size     = var.backup_volume_size
+  monitoring_volume_size = var.monitoring_volume_size
 }
 
 module "server" {

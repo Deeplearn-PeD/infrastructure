@@ -193,6 +193,24 @@ variable "timezone" {
   default     = "America/Sao_Paulo"
 }
 
+variable "epidbot_admin_user" {
+  description = "Default admin username for EpidBot"
+  type        = string
+  default     = "admin"
+}
+
+variable "epidbot_admin_password" {
+  description = "Default admin password for EpidBot (CHANGE IMMEDIATELY!)"
+  type        = string
+  sensitive   = true
+}
+
+variable "epidbot_admin_email" {
+  description = "Default admin email for EpidBot"
+  type        = string
+  default     = "admin@kwar-ai.com.br"
+}
+
 variable "postgres_volume_size" {
   description = "Size of PostgreSQL volume in GB"
   type        = number

@@ -121,13 +121,6 @@ github_client_secret = "your-github-client-secret"
 backup_retention_days = 7
 
 # ============================================
-# Monitoring Configuration
-# ============================================
-
-enable_monitoring      = true
-grafana_admin_password = "CHANGE_ME_GRAFANA_ADMIN_PASSWORD"
-
-# ============================================
 # LLM Configuration
 # ============================================
 

@@ -55,3 +55,13 @@
   delay: 10
   until: result.status == 200
   failed_when: false
+
+- name: Add cron job to clean old plot files
+  cron:
+    name: "Clean EpidBot plot files older than 7 days"
+    job: "find /opt/kwar-ai/epidbot/data/plots -type f -mtime +7 -delete"
+    minute: "0"
+    hour: "3"
+    day: "*"
+    month: "*"
+    weekday: "*"

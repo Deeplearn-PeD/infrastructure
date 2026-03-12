@@ -44,6 +44,17 @@ echo "3. Backing up EpidBot data..."
 ssh root@$SERVER_IP "tar -czf - -C /opt/kwar-ai/epidbot data" > "$LOCAL_BACKUP_DIR/epidbot_data.tar.gz"
 echo "   ✓ EpidBot data backup completed"
 
+# Backup EpidBot DuckDB database (explicit backup)
+echo "3b. Backing up EpidBot DuckDB database..."
+ssh root@$SERVER_IP "/opt/kwar-ai/epidbot/scripts/epidbot-backup.sh backup 2>/dev/null || true"
+ssh root@$SERVER_IP "ls -t /opt/kwar-ai/epidbot/backups/epidbot_duckdb_*.duckdb.gz 2>/dev/null | head -1 | xargs -I {} cat {}" > "$LOCAL_BACKUP_DIR/epidbot_duckdb.duckdb.gz" 2>/dev/null || true
+if [ -s "$LOCAL_BACKUP_DIR/epidbot_duckdb.duckdb.gz" ]; then
+    echo "   ✓ EpidBot DuckDB backup completed"
+else
+    echo "   ⚠ EpidBot DuckDB backup skipped (no database found)"
+    rm -f "$LOCAL_BACKUP_DIR/epidbot_duckdb.duckdb.gz"
+fi
+
 # Backup Docker volumes
 echo "4. Backing up Docker volumes..."
 ssh root@$SERVER_IP "docker run --rm -v postgres-data:/data -v /backup:/backup alpine tar czf /backup/postgres_volume.tar.gz -C /data ." 2>/dev/null || true
@@ -58,8 +69,20 @@ Server IP: $SERVER_IP
 Backup Contents:
 - postgres_backup.sql.gz (PostgreSQL dump)
 - libby_data.tar.gz (Libby data directory)
-- epidbot_data.tar.gz (EpidBot data directory)
+- epidbot_data.tar.gz (EpidBot data directory including DuckDB)
+- epidbot_duckdb.duckdb.gz (EpidBot DuckDB database - explicit backup)
 - postgres_volume.tar.gz (PostgreSQL Docker volume)
+
+EpidBot Database Contents:
+- Users and authentication data
+- Chat sessions and history
+- User configurations
+
+To restore EpidBot DuckDB:
+1. Copy epidbot_duckdb.duckdb.gz to server
+2. gunzip -c epidbot_duckdb.duckdb.gz > chat_history.duckdb
+3. Place in /opt/kwar-ai/epidbot/data/
+Or use: ./scripts/epidbot-backup-manage.sh restore
 EOF
 
 echo "   ✓ Manifest created"

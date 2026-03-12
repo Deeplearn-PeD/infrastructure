@@ -7,6 +7,8 @@
   loop:
     - /opt/kwar-ai/epidbot
     - /opt/kwar-ai/epidbot/data
+    - /opt/kwar-ai/epidbot/backups
+    - /opt/kwar-ai/epidbot/scripts
 
 - name: Create EpidBot data directories with write permissions
   file:
@@ -16,6 +18,18 @@
   loop:
     - /opt/kwar-ai/epidbot/data/pysus
     - /opt/kwar-ai/epidbot/data/plots
+
+- name: Copy EpidBot backup script
+  copy:
+    src: epidbot-backup.sh
+    dest: /opt/kwar-ai/epidbot/scripts/epidbot-backup.sh
+    mode: '0755'
+
+- name: Copy EpidBot restore script
+  copy:
+    src: epidbot-restore.sh
+    dest: /opt/kwar-ai/epidbot/scripts/epidbot-restore.sh
+    mode: '0755'
 
 - name: Create EpidBot environment file
   template:
@@ -55,6 +69,16 @@
   delay: 10
   until: result.status == 200
   failed_when: false
+
+- name: Add cron job to backup DuckDB database
+  cron:
+    name: "Backup EpidBot DuckDB database"
+    job: "/opt/kwar-ai/epidbot/scripts/epidbot-backup.sh backup >> /var/log/epidbot-backup.log 2>&1"
+    minute: "0"
+    hour: "2"
+    day: "*"
+    month: "*"
+    weekday: "*"
 
 - name: Add cron job to clean old plot files
   cron:

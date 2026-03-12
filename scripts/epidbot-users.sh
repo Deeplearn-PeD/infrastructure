@@ -19,17 +19,23 @@ usage() {
     echo ""
     echo "Commands:"
     echo "  list                          List all users"
+    echo "  list-roles                    List all users with their roles"
     echo "  create <user> <email>         Create a new admin user (prompts for password)"
     echo "  create-with-password <user> <password> <email>  Create user non-interactively"
     echo "  passwd <user>                 Change user password"
+    echo "  role <user>                   Show user's role"
+    echo "  set-role <user> <role>        Set user's role (admin or user)"
     echo "  delete <user>                 Delete a user"
     echo "  show-credentials              Show default admin credentials"
     echo "  help                          Show this help message"
     echo ""
     echo "Examples:"
     echo "  $0 list"
+    echo "  $0 list-roles"
     echo "  $0 create researcher researcher@institute.org"
     echo "  $0 create-with-password researcher securepass123 researcher@institute.org"
+    echo "  $0 role admin"
+    echo "  $0 set-role researcher admin"
     echo "  $0 passwd admin"
     echo "  $0 delete researcher"
     echo ""
@@ -53,7 +59,54 @@ cmd_list() {
     check_container
     echo "Listing EpidBot users..."
     echo ""
-    ssh_cmd "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py list"
+    ssh_cmd "docker exec ${CONTAINER_NAME} uv run python auth_cli.py list"
+}
+
+cmd_list_roles() {
+    check_container
+    echo "Listing EpidBot users with roles..."
+    echo ""
+    ssh_cmd "docker exec ${CONTAINER_NAME} uv run python auth_cli.py list-roles"
+}
+
+cmd_role() {
+    check_container
+    local user="$1"
+    
+    if [ -z "$user" ]; then
+        echo "Error: Missing username"
+        echo "Usage: $0 role <username>"
+        exit 1
+    fi
+    
+    ssh_cmd "docker exec ${CONTAINER_NAME} uv run python auth_cli.py role \"$user\""
+}
+
+cmd_set_role() {
+    check_container
+    local user="$1"
+    local role="$2"
+    
+    if [ -z "$user" ]; then
+        echo "Error: Missing username"
+        echo "Usage: $0 set-role <username> <role>"
+        exit 1
+    fi
+    
+    if [ -z "$role" ]; then
+        echo "Error: Missing role"
+        echo "Usage: $0 set-role <username> <role>"
+        echo "Available roles: admin, user"
+        exit 1
+    fi
+    
+    if [ "$role" != "admin" ] && [ "$role" != "user" ]; then
+        echo "Error: Invalid role '$role'. Must be 'admin' or 'user'."
+        exit 1
+    fi
+    
+    echo "Setting role '$role' for user '$user'..."
+    ssh_cmd "docker exec ${CONTAINER_NAME} uv run python auth_cli.py set-role \"$user\" \"$role\""
 }
 
 cmd_create() {
@@ -70,7 +123,7 @@ cmd_create() {
     echo "Creating user: $user ($email)"
     echo "You will be prompted for a password..."
     echo ""
-    ssh_cmd -t "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py create-admin << EOF
+    ssh_cmd -t "docker exec -i ${CONTAINER_NAME} uv run python auth_cli.py create-admin << EOF
 ${user}
 ${email}
 EOF"
@@ -126,7 +179,7 @@ cmd_delete() {
     read -p "Are you sure? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        ssh_cmd "docker exec -it ${CONTAINER_NAME} uv run python auth_cli.py delete \"$user\""
+        ssh_cmd "docker exec ${CONTAINER_NAME} uv run python auth_cli.py delete \"$user\""
         echo "User deleted."
     else
         echo "Cancelled."
@@ -146,6 +199,9 @@ case "${1:-}" in
     list)
         cmd_list
         ;;
+    list-roles)
+        cmd_list_roles
+        ;;
     create)
         cmd_create "$2" "$3"
         ;;
@@ -154,6 +210,12 @@ case "${1:-}" in
         ;;
     passwd)
         cmd_passwd "$2"
+        ;;
+    role)
+        cmd_role "$2"
+        ;;
+    set-role)
+        cmd_set_role "$2" "$3"
         ;;
     delete)
         cmd_delete "$2"

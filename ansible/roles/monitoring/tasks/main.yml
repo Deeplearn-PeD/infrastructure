@@ -8,7 +8,9 @@
     - /opt/kwar-ai/monitoring
     - /opt/kwar-ai/monitoring/dashboards
     - /opt/kwar-ai/monitoring/rules
+    - /opt/kwar-ai/monitoring/scripts
     - /opt/kwar-ai/secrets
+    - /var/lib/node_exporter/textfile_collector
 
 - name: Create Grafana admin password file
   copy:
@@ -38,6 +40,26 @@
     src: monitoring/dashboards/
     dest: /opt/kwar-ai/monitoring/dashboards/
     mode: '0644'
+
+- name: Copy database metrics exporter script
+  copy:
+    src: monitoring/scripts/db-metrics-exporter.sh
+    dest: /opt/kwar-ai/monitoring/scripts/db-metrics-exporter.sh
+    mode: '0755'
+
+- name: Run database metrics exporter initially
+  command: /opt/kwar-ai/monitoring/scripts/db-metrics-exporter.sh
+  changed_when: false
+
+- name: Add cron job for database metrics collection
+  cron:
+    name: "Collect database size metrics for Prometheus"
+    job: "/opt/kwar-ai/monitoring/scripts/db-metrics-exporter.sh"
+    minute: "*"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
 
 - name: Pull monitoring Docker images
   command: docker-compose -f /opt/kwar-ai/monitoring/docker-compose.yml pull

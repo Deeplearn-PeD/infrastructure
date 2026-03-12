@@ -11,9 +11,10 @@
 set -e
 
 # Configuration
-DATA_DIR="${DATA_DIR:-/opt/kwar-ai/epidbot/data}"
+DATA_DIR="${DATA_DIR:-/var/lib/docker/volumes/epidbot_epidbot_data/_data}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/kwar-ai/epidbot/backups}"
 DB_FILE="${DB_FILE:-${DATA_DIR}/chat_history.duckdb}"
+METADATA_FILE="${BACKUP_DIR}/.metadata"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 CONTAINER_NAME="${CONTAINER_NAME:-epidbot}"
 MAX_RETRIES="${MAX_RETRIES:-3}"
@@ -99,6 +100,60 @@ create_backup() {
     fi
 }
 
+extract_metadata() {
+    log "Extracting database metadata..."
+    mkdir -p "$BACKUP_DIR"
+    
+    local table_count=0
+    local total_rows=0
+    local db_copy="/var/lib/docker/volumes/epidbot_epidbot_data/_data/.metadata_copy.duckdb"
+    
+    if [ -f "$DB_FILE" ] && docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        cp "$DB_FILE" "$db_copy" 2>/dev/null || true
+        
+        if [ -f "$db_copy" ]; then
+            table_count=$(docker exec ${CONTAINER_NAME} /app/.venv/bin/python -c "
+import duckdb
+try:
+    conn = duckdb.connect('/data/.metadata_copy.duckdb', read_only=True)
+    result = conn.execute(\"SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog')\").fetchone()
+    print(result[0] if result else 0)
+except Exception as e:
+    print(0)
+" 2>/dev/null) || table_count=0
+            
+            total_rows=$(docker exec ${CONTAINER_NAME} /app/.venv/bin/python -c "
+import duckdb
+try:
+    conn = duckdb.connect('/data/.metadata_copy.duckdb', read_only=True)
+    tables = conn.execute(\"SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog')\").fetchall()
+    total = 0
+    for t in tables:
+        try:
+            count = conn.execute(f'SELECT count(*) FROM {t[0]}').fetchone()
+            total += count[0] if count else 0
+        except:
+            pass
+    print(total)
+except Exception as e:
+    print(0)
+" 2>/dev/null) || total_rows=0
+            
+            rm -f "$db_copy" 2>/dev/null || true
+        fi
+    fi
+    
+    cat > "$METADATA_FILE" << EOF
+# EpidBot DuckDB Metadata
+# Generated: $(date -Iseconds)
+table_count=$table_count
+total_rows=$total_rows
+db_size=$(stat -c %s "$DB_FILE" 2>/dev/null || echo 0)
+EOF
+    
+    log "Metadata saved: $table_count tables, $total_rows total rows"
+}
+
 cleanup_old_backups() {
     log "Cleaning up backups older than $RETENTION_DAYS days..."
     
@@ -169,9 +224,13 @@ show_status() {
 case "${1:-backup}" in
     backup)
         log "Starting EpidBot DuckDB backup..."
+        extract_metadata
         create_backup
         cleanup_old_backups
         log "Backup process completed"
+        ;;
+    metadata)
+        extract_metadata
         ;;
     status)
         show_status
@@ -186,6 +245,7 @@ case "${1:-backup}" in
         echo ""
         echo "Commands:"
         echo "  backup    Create a backup and cleanup old ones (default)"
+        echo "  metadata  Extract and save database metadata only"
         echo "  status    Show backup status and statistics"
         echo "  cleanup   Only cleanup old backups"
         echo "  help      Show this help message"

@@ -8,3 +8,12 @@ datasources:
     isDefault: true
     editable: false
     uid: prometheus
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://kwar-ai-loki:3100
+    editable: false
+    uid: loki
+    jsonData:
+      maxLines: 1000

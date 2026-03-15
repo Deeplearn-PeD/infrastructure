@@ -110,6 +110,33 @@ services:
     networks:
       - monitoring-network
 
+  loki:
+    image: grafana/loki:latest
+    container_name: kwar-ai-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: kwar-ai-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - monitoring-network
+    depends_on:
+      - loki
+
 secrets:
   grafana_password:
     file: /opt/kwar-ai/secrets/grafana_password.txt
@@ -122,3 +149,4 @@ volumes:
   prometheus-data:
   alertmanager-data:
   grafana-data:
+  loki-data:

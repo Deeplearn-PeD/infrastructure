@@ -244,6 +244,26 @@
       "title": "Directory Sizes by Category",
       "type": "bargauge",
       "targets": [{ "expr": "sort_desc(kwar_ai_directory_size_bytes)", "legendFormat": "{{name}}", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 66 },
+      "id": 14,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "title": "Recent Container Logs",
+      "type": "logs",
+      "targets": [
+        { "expr": "{job=~\"docker|epidbot|libby\"}", "refId": "A" }
+      ]
     }
   ],
   "refresh": "30s",
